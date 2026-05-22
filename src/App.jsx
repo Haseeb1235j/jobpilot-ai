@@ -241,6 +241,7 @@ function App() {
 
   const [aiInput, setAiInput] = useState("")
   const [aiLoading, setAiLoading] = useState(false)
+  const [openProfileSection, setOpenProfileSection] = useState("personal")
 
   useEffect(() => {
     localStorage.setItem("jobpilot_profile", JSON.stringify(profile))
@@ -258,9 +259,9 @@ function App() {
   }, [aiMessages])
 
   const inputClass =
-    "w-full mt-2 bg-black/30 border border-white/10 rounded-xl p-3 outline-none"
+    "w-full mt-2 bg-black/30 border border-white/10 rounded-xl p-3 outline-none focus:border-blue-400 transition"
   const textareaClass =
-    "w-full mt-2 bg-black/30 border border-white/10 rounded-xl p-3 outline-none"
+    "w-full mt-2 bg-black/30 border border-white/10 rounded-xl p-3 outline-none focus:border-blue-400 transition"
 
   const scrollToSection = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })
@@ -712,30 +713,67 @@ ${profile.phone}`,
     ])
   }
 
-  const profileScore = Math.min(
-    100,
-    Math.round(
-      [
-        profile.name,
-        profile.role,
-        profile.email,
-        profile.phone,
-        profile.location,
-        profile.portfolio,
-        profile.technicalSkills,
-        profile.summary,
-        profile.projects.find((p) => p.name && p.description)?.name,
-        profile.educations.find((e) => e.degree && e.college)?.degree,
-      ].filter((x) => x && String(x).trim().length > 3).length * 10
-    )
-  )
+  const isFilled = (value) => value && String(value).trim().length > 3
 
-  const SectionCard = ({ title, children }) => (
-    <div className="bg-white/5 border border-white/10 rounded-3xl p-8">
-      <h3 className="text-2xl font-bold mb-6">{title}</h3>
-      {children}
-    </div>
-  )
+  const sectionStatus = {
+    personal:
+      isFilled(profile.name) &&
+      isFilled(profile.role) &&
+      isFilled(profile.email) &&
+      isFilled(profile.phone),
+    summary: isFilled(profile.summary),
+    skills: isFilled(profile.technicalSkills),
+    education: profile.educations.some((edu) => isFilled(edu.degree) && isFilled(edu.college)),
+    projects: profile.projects.some((project) => isFilled(project.name) && isFilled(project.description)),
+    experience: profile.experiences.some((exp) => isFilled(exp.description)),
+    certifications: profile.certifications.length > 0,
+    achievements: profile.achievements.length > 0,
+    languages: profile.languages.some((lang) => isFilled(lang.name)),
+    preferences: isFilled(profile.resumeStyle) && isFilled(profile.preferredLocation),
+  }
+
+  const completedSections = Object.values(sectionStatus).filter(Boolean).length
+  const totalSections = Object.keys(sectionStatus).length
+  const profileScore = Math.round((completedSections / totalSections) * 100)
+
+  const AccordionCard = ({ id, title, description, count, children }) => {
+    const isOpen = openProfileSection === id
+    const done = sectionStatus[id]
+
+    return (
+      <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+        <button
+          onClick={() => setOpenProfileSection(isOpen ? "" : id)}
+          className="w-full p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 text-left hover:bg-white/5 transition"
+        >
+          <div>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{isOpen ? "▾" : "▸"}</span>
+              <h3 className="text-2xl font-bold">{title}</h3>
+              <span
+                className={`text-xs px-3 py-1 rounded-full ${
+                  done
+                    ? "bg-green-500/20 text-green-300"
+                    : "bg-yellow-500/20 text-yellow-300"
+                }`}
+              >
+                {done ? "Done" : "Needs info"}
+              </span>
+            </div>
+            <p className="text-gray-400 mt-2">{description}</p>
+          </div>
+
+          {count !== undefined && (
+            <div className="bg-black/30 border border-white/10 rounded-2xl px-4 py-2 text-sm text-gray-300">
+              {count}
+            </div>
+          )}
+        </button>
+
+        {isOpen && <div className="px-6 pb-6">{children}</div>}
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#050816] text-white">
@@ -780,9 +818,9 @@ ${profile.phone}`,
             </h2>
 
             <p className="text-gray-400 text-xl leading-relaxed mb-8">
-              JobPilot helps candidates fill complete resume details, search real jobs,
+              JobPilot helps candidates create resume details, search jobs,
               generate professional resumes, improve skills, prepare for interviews,
-              and open Gmail-ready job application emails.
+              and open Gmail-ready job emails.
             </p>
 
             <div className="flex flex-wrap gap-4">
@@ -841,7 +879,7 @@ ${profile.phone}`,
           <h2 className="text-5xl font-bold mb-4">Ask AI Anything</h2>
           <p className="text-gray-400 text-lg">
             Generate resumes, improve skills, prepare for interviews, create job emails,
-            and get personal career guidance using your full candidate details.
+            and get personal career guidance using your candidate details.
           </p>
         </div>
 
@@ -1390,523 +1428,682 @@ ${profile.phone}`,
           </p>
           <h2 className="text-5xl font-bold mb-4">Complete Your Profile</h2>
           <p className="text-gray-400 text-lg">
-            Add as many projects, education details, experiences, certifications,
-            achievements, and languages as you need.
+            A clean resume builder form. Open only the section you need, add multiple
+            projects or experiences, and let AI generate professional results.
           </p>
         </div>
 
-        <div className="space-y-8">
-          <SectionCard title="Personal Details">
-            <div className="grid md:grid-cols-2 gap-5">
+        <div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-8">
+          <div className="grid md:grid-cols-4 gap-5 items-center">
+            <div>
+              <p className="text-gray-400 text-sm">Profile Score</p>
+              <h3 className="text-5xl font-bold mt-2">{profileScore}%</h3>
+            </div>
+
+            <div>
+              <p className="text-gray-400 text-sm">Completed Sections</p>
+              <h3 className="text-4xl font-bold mt-2">
+                {completedSections}/{totalSections}
+              </h3>
+            </div>
+
+            <button
+              onClick={() =>
+                quickAskAgent(
+                  "Check my candidate profile and tell me what resume details are missing or weak. Give exact improvements."
+                )
+              }
+              className="bg-white/10 hover:bg-white/20 py-4 rounded-2xl font-semibold"
+            >
+              Check Missing Details
+            </button>
+
+            <button
+              onClick={() =>
+                quickAskAgent(
+                  "Generate my professional ATS-friendly resume using all my candidate profile details. Make it clean, truthful, strong, and suitable for my target role."
+                )
+              }
+              className="bg-purple-600 hover:bg-purple-700 py-4 rounded-2xl font-semibold"
+            >
+              Generate Resume with AI
+            </button>
+          </div>
+
+          <div className="w-full bg-black/30 rounded-full h-3 mt-6 overflow-hidden">
+            <div
+              className="bg-green-500 h-3 rounded-full transition-all"
+              style={{ width: `${profileScore}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="grid lg:grid-cols-[280px_1fr] gap-6">
+          <div className="bg-white/5 border border-white/10 rounded-3xl p-5 h-fit sticky top-28">
+            <h3 className="text-xl font-bold mb-4">Sections</h3>
+
+            <div className="space-y-2">
               {[
-                ["name", "Full Name"],
-                ["role", "Target Role"],
-                ["email", "Email"],
-                ["phone", "Phone"],
-                ["location", "Location"],
-                ["linkedin", "LinkedIn"],
-                ["github", "GitHub"],
-                ["portfolio", "Portfolio"],
-              ].map(([field, label]) => (
-                <div key={field}>
-                  <label className="text-gray-400 text-sm">{label}</label>
-                  <input
-                    value={profile[field]}
-                    onChange={(e) => updateProfile(field, e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
+                ["personal", "Personal"],
+                ["summary", "Summary"],
+                ["skills", "Skills"],
+                ["education", "Education"],
+                ["projects", "Projects"],
+                ["experience", "Experience"],
+                ["certifications", "Certifications"],
+                ["achievements", "Achievements"],
+                ["languages", "Languages"],
+                ["preferences", "Preferences"],
+              ].map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setOpenProfileSection(id)}
+                  className={`w-full flex justify-between items-center px-4 py-3 rounded-xl text-left transition ${
+                    openProfileSection === id
+                      ? "bg-blue-600 text-white"
+                      : "bg-black/20 hover:bg-white/10 text-gray-300"
+                  }`}
+                >
+                  <span>{label}</span>
+                  <span>{sectionStatus[id] ? "✅" : "○"}</span>
+                </button>
               ))}
             </div>
-          </SectionCard>
+          </div>
 
-          <SectionCard title="Professional Summary">
-            <textarea
-              value={profile.summary}
-              onChange={(e) => updateProfile("summary", e.target.value)}
-              rows="4"
-              className={textareaClass}
-              placeholder="Write a short professional summary..."
-            />
-          </SectionCard>
-
-          <SectionCard title="Skills">
-            <div className="grid md:grid-cols-3 gap-5">
-              <div>
-                <label className="text-gray-400 text-sm">Technical Skills</label>
-                <textarea
-                  value={profile.technicalSkills}
-                  onChange={(e) => updateProfile("technicalSkills", e.target.value)}
-                  rows="5"
-                  className={textareaClass}
-                />
-              </div>
-
-              <div>
-                <label className="text-gray-400 text-sm">Soft Skills</label>
-                <textarea
-                  value={profile.softSkills}
-                  onChange={(e) => updateProfile("softSkills", e.target.value)}
-                  rows="5"
-                  className={textareaClass}
-                />
-              </div>
-
-              <div>
-                <label className="text-gray-400 text-sm">Tools / Technologies</label>
-                <textarea
-                  value={profile.tools}
-                  onChange={(e) => updateProfile("tools", e.target.value)}
-                  rows="5"
-                  className={textareaClass}
-                />
-              </div>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Education">
-            <div className="space-y-6">
-              {profile.educations.map((edu, index) => (
-                <div
-                  key={index}
-                  className="bg-black/20 border border-white/10 rounded-2xl p-5"
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-xl font-semibold">
-                      Education {index + 1}
-                    </h4>
-                    {profile.educations.length > 1 && (
-                      <button
-                        onClick={() => removeArrayItem("educations", index)}
-                        className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
-                      >
-                        Remove
-                      </button>
-                    )}
+          <div className="space-y-5">
+            <AccordionCard
+              id="personal"
+              title="Personal Details"
+              description="Basic identity and contact details."
+            >
+              <div className="grid md:grid-cols-2 gap-5">
+                {[
+                  ["name", "Full Name"],
+                  ["role", "Target Role"],
+                  ["email", "Email"],
+                  ["phone", "Phone"],
+                  ["location", "Location"],
+                  ["linkedin", "LinkedIn"],
+                  ["github", "GitHub"],
+                  ["portfolio", "Portfolio"],
+                ].map(([field, label]) => (
+                  <div key={field}>
+                    <label className="text-gray-400 text-sm">{label}</label>
+                    <input
+                      value={profile[field]}
+                      onChange={(e) => updateProfile(field, e.target.value)}
+                      className={inputClass}
+                    />
                   </div>
+                ))}
+              </div>
+            </AccordionCard>
 
-                  <div className="grid md:grid-cols-2 gap-5">
-                    {[
-                      ["degree", "Degree"],
-                      ["college", "College / University"],
-                      ["branch", "Branch / Course"],
-                      ["year", "Year"],
-                      ["score", "CGPA / Percentage"],
-                    ].map(([field, label]) => (
-                      <div key={field}>
-                        <label className="text-gray-400 text-sm">{label}</label>
+            <AccordionCard
+              id="summary"
+              title="Professional Summary"
+              description="Short summary about the candidate."
+            >
+              <textarea
+                value={profile.summary}
+                onChange={(e) => updateProfile("summary", e.target.value)}
+                rows="5"
+                className={textareaClass}
+                placeholder="Write a short professional summary..."
+              />
+            </AccordionCard>
+
+            <AccordionCard
+              id="skills"
+              title="Skills"
+              description="Technical skills, soft skills, and tools."
+            >
+              <div className="grid md:grid-cols-3 gap-5">
+                <div>
+                  <label className="text-gray-400 text-sm">Technical Skills</label>
+                  <textarea
+                    value={profile.technicalSkills}
+                    onChange={(e) =>
+                      updateProfile("technicalSkills", e.target.value)
+                    }
+                    rows="5"
+                    className={textareaClass}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-gray-400 text-sm">Soft Skills</label>
+                  <textarea
+                    value={profile.softSkills}
+                    onChange={(e) => updateProfile("softSkills", e.target.value)}
+                    rows="5"
+                    className={textareaClass}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-gray-400 text-sm">Tools / Technologies</label>
+                  <textarea
+                    value={profile.tools}
+                    onChange={(e) => updateProfile("tools", e.target.value)}
+                    rows="5"
+                    className={textareaClass}
+                  />
+                </div>
+              </div>
+            </AccordionCard>
+
+            <AccordionCard
+              id="education"
+              title="Education"
+              description="Add one or more education records."
+              count={`${profile.educations.length} item(s)`}
+            >
+              <div className="space-y-5">
+                {profile.educations.map((edu, index) => (
+                  <div
+                    key={index}
+                    className="bg-black/20 border border-white/10 rounded-2xl p-5"
+                  >
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-xl font-semibold">
+                        Education {index + 1}
+                      </h4>
+                      {profile.educations.length > 1 && (
+                        <button
+                          onClick={() => removeArrayItem("educations", index)}
+                          className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-5">
+                      {[
+                        ["degree", "Degree"],
+                        ["college", "College / University"],
+                        ["branch", "Branch / Course"],
+                        ["year", "Year"],
+                        ["score", "CGPA / Percentage"],
+                      ].map(([field, label]) => (
+                        <div key={field}>
+                          <label className="text-gray-400 text-sm">{label}</label>
+                          <input
+                            value={edu[field]}
+                            onChange={(e) =>
+                              updateArrayItem(
+                                "educations",
+                                index,
+                                field,
+                                e.target.value
+                              )
+                            }
+                            className={inputClass}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  onClick={() => addArrayItem("educations", { ...emptyEducation })}
+                  className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
+                >
+                  + Add Education
+                </button>
+              </div>
+            </AccordionCard>
+
+            <AccordionCard
+              id="projects"
+              title="Projects"
+              description="Add portfolio projects with tech stack and links."
+              count={`${profile.projects.length} item(s)`}
+            >
+              <div className="space-y-5">
+                {profile.projects.map((project, index) => (
+                  <div
+                    key={index}
+                    className="bg-black/20 border border-white/10 rounded-2xl p-5"
+                  >
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-xl font-semibold">
+                        Project {index + 1}
+                      </h4>
+                      {profile.projects.length > 1 && (
+                        <button
+                          onClick={() => removeArrayItem("projects", index)}
+                          className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-5">
+                      <div>
+                        <label className="text-gray-400 text-sm">Project Name</label>
                         <input
-                          value={edu[field]}
+                          value={project.name}
                           onChange={(e) =>
                             updateArrayItem(
-                              "educations",
+                              "projects",
                               index,
-                              field,
+                              "name",
                               e.target.value
                             )
                           }
                           className={inputClass}
                         />
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
 
-              <button
-                onClick={() => addArrayItem("educations", { ...emptyEducation })}
-                className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
-              >
-                + Add Education
-              </button>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Projects">
-            <div className="space-y-6">
-              {profile.projects.map((project, index) => (
-                <div
-                  key={index}
-                  className="bg-black/20 border border-white/10 rounded-2xl p-5"
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-xl font-semibold">
-                      Project {index + 1}
-                    </h4>
-                    {profile.projects.length > 1 && (
-                      <button
-                        onClick={() => removeArrayItem("projects", index)}
-                        className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="text-gray-400 text-sm">Project Name</label>
-                      <input
-                        value={project.name}
-                        onChange={(e) =>
-                          updateArrayItem("projects", index, "name", e.target.value)
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-gray-400 text-sm">Project Link</label>
-                      <input
-                        value={project.link}
-                        onChange={(e) =>
-                          updateArrayItem("projects", index, "link", e.target.value)
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-gray-400 text-sm">Tech Stack</label>
-                      <textarea
-                        value={project.tech}
-                        onChange={(e) =>
-                          updateArrayItem("projects", index, "tech", e.target.value)
-                        }
-                        rows="4"
-                        className={textareaClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-gray-400 text-sm">Project Description</label>
-                      <textarea
-                        value={project.description}
-                        onChange={(e) =>
-                          updateArrayItem(
-                            "projects",
-                            index,
-                            "description",
-                            e.target.value
-                          )
-                        }
-                        rows="4"
-                        className={textareaClass}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              <button
-                onClick={() => addArrayItem("projects", { ...emptyProject })}
-                className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
-              >
-                + Add Project
-              </button>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Experience">
-            <div className="space-y-6">
-              {profile.experiences.map((exp, index) => (
-                <div
-                  key={index}
-                  className="bg-black/20 border border-white/10 rounded-2xl p-5"
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-xl font-semibold">
-                      Experience {index + 1}
-                    </h4>
-                    {profile.experiences.length > 1 && (
-                      <button
-                        onClick={() => removeArrayItem("experiences", index)}
-                        className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="text-gray-400 text-sm">Experience Type</label>
-                      <select
-                        value={exp.type}
-                        onChange={(e) =>
-                          updateArrayItem("experiences", index, "type", e.target.value)
-                        }
-                        className={inputClass}
-                      >
-                        <option>Fresher</option>
-                        <option>Internship</option>
-                        <option>Job</option>
-                        <option>Freelance</option>
-                      </select>
-                    </div>
-
-                    {[
-                      ["company", "Company Name"],
-                      ["role", "Role"],
-                      ["duration", "Duration"],
-                    ].map(([field, label]) => (
-                      <div key={field}>
-                        <label className="text-gray-400 text-sm">{label}</label>
+                      <div>
+                        <label className="text-gray-400 text-sm">Project Link</label>
                         <input
-                          value={exp[field]}
+                          value={project.link}
+                          onChange={(e) =>
+                            updateArrayItem(
+                              "projects",
+                              index,
+                              "link",
+                              e.target.value
+                            )
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-gray-400 text-sm">Tech Stack</label>
+                        <textarea
+                          value={project.tech}
+                          onChange={(e) =>
+                            updateArrayItem(
+                              "projects",
+                              index,
+                              "tech",
+                              e.target.value
+                            )
+                          }
+                          rows="4"
+                          className={textareaClass}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-gray-400 text-sm">Project Description</label>
+                        <textarea
+                          value={project.description}
+                          onChange={(e) =>
+                            updateArrayItem(
+                              "projects",
+                              index,
+                              "description",
+                              e.target.value
+                            )
+                          }
+                          rows="4"
+                          className={textareaClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  onClick={() => addArrayItem("projects", { ...emptyProject })}
+                  className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
+                >
+                  + Add Project
+                </button>
+              </div>
+            </AccordionCard>
+
+            <AccordionCard
+              id="experience"
+              title="Experience"
+              description="Add internships, jobs, freelance, or practical experience."
+              count={`${profile.experiences.length} item(s)`}
+            >
+              <div className="space-y-5">
+                {profile.experiences.map((exp, index) => (
+                  <div
+                    key={index}
+                    className="bg-black/20 border border-white/10 rounded-2xl p-5"
+                  >
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-xl font-semibold">
+                        Experience {index + 1}
+                      </h4>
+                      {profile.experiences.length > 1 && (
+                        <button
+                          onClick={() => removeArrayItem("experiences", index)}
+                          className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-5">
+                      <div>
+                        <label className="text-gray-400 text-sm">Experience Type</label>
+                        <select
+                          value={exp.type}
                           onChange={(e) =>
                             updateArrayItem(
                               "experiences",
                               index,
-                              field,
+                              "type",
                               e.target.value
                             )
                           }
                           className={inputClass}
-                        />
+                        >
+                          <option>Fresher</option>
+                          <option>Internship</option>
+                          <option>Job</option>
+                          <option>Freelance</option>
+                        </select>
                       </div>
-                    ))}
 
-                    <div className="md:col-span-2">
-                      <label className="text-gray-400 text-sm">Description</label>
-                      <textarea
-                        value={exp.description}
-                        onChange={(e) =>
-                          updateArrayItem(
-                            "experiences",
-                            index,
-                            "description",
-                            e.target.value
-                          )
-                        }
-                        rows="5"
-                        className={textareaClass}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
+                      {[
+                        ["company", "Company Name"],
+                        ["role", "Role"],
+                        ["duration", "Duration"],
+                      ].map(([field, label]) => (
+                        <div key={field}>
+                          <label className="text-gray-400 text-sm">{label}</label>
+                          <input
+                            value={exp[field]}
+                            onChange={(e) =>
+                              updateArrayItem(
+                                "experiences",
+                                index,
+                                field,
+                                e.target.value
+                              )
+                            }
+                            className={inputClass}
+                          />
+                        </div>
+                      ))}
 
-              <button
-                onClick={() => addArrayItem("experiences", { ...emptyExperience })}
-                className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
-              >
-                + Add Experience
-              </button>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Certifications">
-            <div className="space-y-6">
-              {profile.certifications.map((cert, index) => (
-                <div
-                  key={index}
-                  className="bg-black/20 border border-white/10 rounded-2xl p-5"
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-xl font-semibold">
-                      Certification {index + 1}
-                    </h4>
-                    <button
-                      onClick={() => removeArrayItem("certifications", index)}
-                      className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
-                    >
-                      Remove
-                    </button>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-5">
-                    {[
-                      ["name", "Certification Name"],
-                      ["issuer", "Issued By"],
-                      ["year", "Year"],
-                      ["link", "Certificate Link"],
-                    ].map(([field, label]) => (
-                      <div key={field}>
-                        <label className="text-gray-400 text-sm">{label}</label>
-                        <input
-                          value={cert[field]}
+                      <div className="md:col-span-2">
+                        <label className="text-gray-400 text-sm">Description</label>
+                        <textarea
+                          value={exp.description}
                           onChange={(e) =>
                             updateArrayItem(
-                              "certifications",
+                              "experiences",
                               index,
-                              field,
+                              "description",
                               e.target.value
                             )
                           }
-                          className={inputClass}
+                          rows="5"
+                          className={textareaClass}
                         />
                       </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-
-              <button
-                onClick={() =>
-                  addArrayItem("certifications", { ...emptyCertification })
-                }
-                className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
-              >
-                + Add Certification
-              </button>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Achievements">
-            <div className="space-y-6">
-              {profile.achievements.map((achievement, index) => (
-                <div
-                  key={index}
-                  className="bg-black/20 border border-white/10 rounded-2xl p-5"
-                >
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-xl font-semibold">
-                      Achievement {index + 1}
-                    </h4>
-                    <button
-                      onClick={() => removeArrayItem("achievements", index)}
-                      className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
-                    >
-                      Remove
-                    </button>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="text-gray-400 text-sm">Title</label>
-                      <input
-                        value={achievement.title}
-                        onChange={(e) =>
-                          updateArrayItem(
-                            "achievements",
-                            index,
-                            "title",
-                            e.target.value
-                          )
-                        }
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-gray-400 text-sm">Description</label>
-                      <textarea
-                        value={achievement.description}
-                        onChange={(e) =>
-                          updateArrayItem(
-                            "achievements",
-                            index,
-                            "description",
-                            e.target.value
-                          )
-                        }
-                        rows="4"
-                        className={textareaClass}
-                      />
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
 
-              <button
-                onClick={() => addArrayItem("achievements", { ...emptyAchievement })}
-                className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
-              >
-                + Add Achievement
-              </button>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Languages">
-            <div className="space-y-6">
-              {profile.languages.map((language, index) => (
-                <div
-                  key={index}
-                  className="bg-black/20 border border-white/10 rounded-2xl p-5"
+                <button
+                  onClick={() => addArrayItem("experiences", { ...emptyExperience })}
+                  className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
                 >
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-xl font-semibold">
-                      Language {index + 1}
-                    </h4>
-                    {profile.languages.length > 1 && (
+                  + Add Experience
+                </button>
+              </div>
+            </AccordionCard>
+
+            <AccordionCard
+              id="certifications"
+              title="Certifications"
+              description="Add certifications, course completions, and credentials."
+              count={`${profile.certifications.length} item(s)`}
+            >
+              <div className="space-y-5">
+                {profile.certifications.map((cert, index) => (
+                  <div
+                    key={index}
+                    className="bg-black/20 border border-white/10 rounded-2xl p-5"
+                  >
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-xl font-semibold">
+                        Certification {index + 1}
+                      </h4>
                       <button
-                        onClick={() => removeArrayItem("languages", index)}
+                        onClick={() => removeArrayItem("certifications", index)}
                         className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
                       >
                         Remove
                       </button>
-                    )}
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-5">
-                    <div>
-                      <label className="text-gray-400 text-sm">Language</label>
-                      <input
-                        value={language.name}
-                        onChange={(e) =>
-                          updateArrayItem("languages", index, "name", e.target.value)
-                        }
-                        className={inputClass}
-                      />
                     </div>
 
-                    <div>
-                      <label className="text-gray-400 text-sm">Level</label>
-                      <input
-                        value={language.level}
-                        onChange={(e) =>
-                          updateArrayItem("languages", index, "level", e.target.value)
-                        }
-                        placeholder="Native / Good / Fluent"
-                        className={inputClass}
-                      />
+                    <div className="grid md:grid-cols-2 gap-5">
+                      {[
+                        ["name", "Certification Name"],
+                        ["issuer", "Issued By"],
+                        ["year", "Year"],
+                        ["link", "Certificate Link"],
+                      ].map(([field, label]) => (
+                        <div key={field}>
+                          <label className="text-gray-400 text-sm">{label}</label>
+                          <input
+                            value={cert[field]}
+                            onChange={(e) =>
+                              updateArrayItem(
+                                "certifications",
+                                index,
+                                field,
+                                e.target.value
+                              )
+                            }
+                            className={inputClass}
+                          />
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
 
-              <button
-                onClick={() => addArrayItem("languages", { ...emptyLanguage })}
-                className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
-              >
-                + Add Language
-              </button>
-            </div>
-          </SectionCard>
-
-          <SectionCard title="Resume Preferences">
-            <div className="grid md:grid-cols-2 gap-5">
-              <div>
-                <label className="text-gray-400 text-sm">Resume Style</label>
-                <select
-                  value={profile.resumeStyle}
-                  onChange={(e) => updateProfile("resumeStyle", e.target.value)}
-                  className={inputClass}
+                <button
+                  onClick={() =>
+                    addArrayItem("certifications", { ...emptyCertification })
+                  }
+                  className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
                 >
-                  <option>ATS Friendly</option>
-                  <option>Fresher Resume</option>
-                  <option>Professional Resume</option>
-                  <option>Modern Resume</option>
-                </select>
+                  + Add Certification
+                </button>
               </div>
+            </AccordionCard>
 
-              {[
-                ["preferredLocation", "Preferred Job Location"],
-                ["expectedSalary", "Expected Salary"],
-                ["noticePeriod", "Notice Period"],
-              ].map(([field, label]) => (
-                <div key={field}>
-                  <label className="text-gray-400 text-sm">{label}</label>
-                  <input
-                    value={profile[field]}
-                    onChange={(e) => updateProfile(field, e.target.value)}
+            <AccordionCard
+              id="achievements"
+              title="Achievements"
+              description="Add awards, hackathons, academic or coding achievements."
+              count={`${profile.achievements.length} item(s)`}
+            >
+              <div className="space-y-5">
+                {profile.achievements.map((achievement, index) => (
+                  <div
+                    key={index}
+                    className="bg-black/20 border border-white/10 rounded-2xl p-5"
+                  >
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-xl font-semibold">
+                        Achievement {index + 1}
+                      </h4>
+                      <button
+                        onClick={() => removeArrayItem("achievements", index)}
+                        className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-5">
+                      <div>
+                        <label className="text-gray-400 text-sm">Title</label>
+                        <input
+                          value={achievement.title}
+                          onChange={(e) =>
+                            updateArrayItem(
+                              "achievements",
+                              index,
+                              "title",
+                              e.target.value
+                            )
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-gray-400 text-sm">Description</label>
+                        <textarea
+                          value={achievement.description}
+                          onChange={(e) =>
+                            updateArrayItem(
+                              "achievements",
+                              index,
+                              "description",
+                              e.target.value
+                            )
+                          }
+                          rows="4"
+                          className={textareaClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  onClick={() =>
+                    addArrayItem("achievements", { ...emptyAchievement })
+                  }
+                  className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
+                >
+                  + Add Achievement
+                </button>
+              </div>
+            </AccordionCard>
+
+            <AccordionCard
+              id="languages"
+              title="Languages"
+              description="Add languages and proficiency levels."
+              count={`${profile.languages.length} item(s)`}
+            >
+              <div className="space-y-5">
+                {profile.languages.map((language, index) => (
+                  <div
+                    key={index}
+                    className="bg-black/20 border border-white/10 rounded-2xl p-5"
+                  >
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-xl font-semibold">
+                        Language {index + 1}
+                      </h4>
+                      {profile.languages.length > 1 && (
+                        <button
+                          onClick={() => removeArrayItem("languages", index)}
+                          className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-5">
+                      <div>
+                        <label className="text-gray-400 text-sm">Language</label>
+                        <input
+                          value={language.name}
+                          onChange={(e) =>
+                            updateArrayItem(
+                              "languages",
+                              index,
+                              "name",
+                              e.target.value
+                            )
+                          }
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-gray-400 text-sm">Level</label>
+                        <input
+                          value={language.level}
+                          onChange={(e) =>
+                            updateArrayItem(
+                              "languages",
+                              index,
+                              "level",
+                              e.target.value
+                            )
+                          }
+                          placeholder="Native / Good / Fluent"
+                          className={inputClass}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  onClick={() => addArrayItem("languages", { ...emptyLanguage })}
+                  className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
+                >
+                  + Add Language
+                </button>
+              </div>
+            </AccordionCard>
+
+            <AccordionCard
+              id="preferences"
+              title="Resume Preferences"
+              description="Resume style and job preferences."
+            >
+              <div className="grid md:grid-cols-2 gap-5">
+                <div>
+                  <label className="text-gray-400 text-sm">Resume Style</label>
+                  <select
+                    value={profile.resumeStyle}
+                    onChange={(e) => updateProfile("resumeStyle", e.target.value)}
                     className={inputClass}
-                  />
+                  >
+                    <option>ATS Friendly</option>
+                    <option>Fresher Resume</option>
+                    <option>Professional Resume</option>
+                    <option>Modern Resume</option>
+                  </select>
                 </div>
-              ))}
-            </div>
-          </SectionCard>
+
+                {[
+                  ["preferredLocation", "Preferred Job Location"],
+                  ["expectedSalary", "Expected Salary"],
+                  ["noticePeriod", "Notice Period"],
+                ].map(([field, label]) => (
+                  <div key={field}>
+                    <label className="text-gray-400 text-sm">{label}</label>
+                    <input
+                      value={profile[field]}
+                      onChange={(e) => updateProfile(field, e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                ))}
+              </div>
+            </AccordionCard>
+          </div>
         </div>
       </section>
     </div>
