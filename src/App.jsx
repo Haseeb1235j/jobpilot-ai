@@ -176,7 +176,7 @@ ${profile.name}`
 4. Copy/edit the recruiter message.
 5. Generate email draft.
 6. Enter recipient email.
-7. Send only after reviewing.
+7. Open in Gmail and send manually.
 8. Mark job as Applied.
 9. Follow up after 3 to 5 days.`
 
@@ -258,6 +258,32 @@ ${profile.portfolio}`,
     setTimeout(() => scrollToSection("workspace"), 200)
   }
 
+  const openInGmail = () => {
+    if (!selectedJob || !emailDraft) {
+      setEmailStatus("Please select a job first.")
+      return
+    }
+
+    if (!recipientEmail.trim()) {
+      setEmailStatus("Please enter recipient email.")
+      return
+    }
+
+    if (!emailDraft.subject || !emailDraft.body) {
+      setEmailStatus("Please check subject and body before opening Gmail.")
+      return
+    }
+
+    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(
+      recipientEmail.trim()
+    )}&su=${encodeURIComponent(emailDraft.subject)}&body=${encodeURIComponent(
+      emailDraft.body
+    )}`
+
+    window.open(gmailUrl, "_blank")
+    setEmailStatus("Gmail opened ✅ Review and click Send in Gmail.")
+  }
+
   const sendEmail = async () => {
     if (!selectedJob || !emailDraft) {
       setEmailStatus("Please select a job first.")
@@ -275,7 +301,7 @@ ${profile.portfolio}`,
     }
 
     const confirmSend = window.confirm(
-      `Send email to ${recipientEmail}?\n\nCheck the subject and body before sending.`
+      `Send email to ${recipientEmail}?\n\nThis uses JobPilot/Resend sender. For professional Gmail sender, use Open in Gmail.`
     )
 
     if (!confirmSend) return
@@ -474,7 +500,7 @@ ${profile.portfolio}`,
 
             <p className="text-gray-400 text-xl leading-relaxed mb-8">
               A simple AI-powered workflow for real job search, application preparation,
-              reviewed email sending, and application tracking.
+              Gmail sending, and application tracking.
             </p>
 
             <div className="flex flex-wrap gap-4">
@@ -638,7 +664,7 @@ ${profile.portfolio}`,
           <p className="text-blue-400 font-semibold mb-3">Step 2</p>
           <h2 className="text-5xl font-bold mb-4">Application Workspace</h2>
           <p className="text-gray-400 text-lg">
-            Review the selected job, copy materials, or send email after approval.
+            Review the selected job, copy materials, or open Gmail with the email ready.
           </p>
         </div>
 
@@ -715,7 +741,14 @@ ${profile.portfolio}`,
                   className="w-full mt-2 bg-black/30 border border-white/10 rounded-xl p-4 outline-none leading-relaxed"
                 />
 
-                <div className="grid md:grid-cols-3 gap-4 mt-5">
+                <div className="grid md:grid-cols-4 gap-4 mt-5">
+                  <button
+                    onClick={openInGmail}
+                    className="bg-blue-600 hover:bg-blue-700 py-4 rounded-xl font-semibold"
+                  >
+                    Open in Gmail
+                  </button>
+
                   <button
                     onClick={sendEmail}
                     disabled={sendingEmail}
