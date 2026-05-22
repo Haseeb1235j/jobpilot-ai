@@ -18,19 +18,178 @@ const groq = new Groq({
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-let chatHistory = [
-  {
-    role: "system",
-    content:
-      "You are JobPilot AI, a friendly career assistant. Help users with jobs, resumes, cover letters, applications, interview preparation, and career planning. Be friendly and helpful.",
-  },
+const requiredProfileFields = [
+  ["name", "Full Name"],
+  ["role", "Target Role"],
+  ["email", "Email"],
+  ["phone", "Phone"],
+  ["skills", "Skills"],
+  ["projects", "Projects"],
+  ["experience", "Experience"],
+  ["portfolio", "Portfolio / GitHub"],
 ]
+
+const getMissingProfileFields = (profile = {}) => {
+  return requiredProfileFields
+    .filter(([key]) => !profile[key] || String(profile[key]).trim().length < 4)
+    .map(([, label]) => label)
+}
+
+const isResumeRequest = (message = "") => {
+  const text = message.toLowerCase()
+  return (
+    text.includes("resume") ||
+    text.includes("cv") ||
+    text.includes("generate my resume") ||
+    text.includes("make my resume")
+  )
+}
+
+const isApplicationEmailRequest = (message = "") => {
+  const text = message.toLowerCase()
+  return (
+    text.includes("application email") ||
+    text.includes("job email") ||
+    text.includes("email for this job") ||
+    text.includes("apply email") ||
+    text.includes("mail for this job")
+  )
+}
 
 app.get("/", (req, res) => {
   res.json({
     message: "JobPilot backend is running",
-    routes: ["/chat", "/jobs", "/send-email"],
+    routes: ["/chat", "/agent", "/jobs", "/send-email"],
   })
+})
+
+app.post("/agent", async (req, res) => {
+  try {
+    const { message, profile, selectedJob, savedApplications } = req.body
+
+    if (!message) {
+      return res.status(400).json({
+        success: false,
+        reply: "Please enter a message.",
+      })
+    }
+
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        reply: "AI key is missing in backend environment.",
+      })
+    }
+
+    const missingFields = getMissingProfileFields(profile)
+
+    if (isResumeRequest(message) && missingFields.length > 0) {
+      return res.json({
+        success: true,
+        reply: `I can generate a professional resume, but I need a few details first.
+
+Please complete these fields in the Profile section:
+
+${missingFields.map((field) => `- ${field}`).join("\n")}
+
+After filling them, ask me again: "Generate my resume".`,
+      })
+    }
+
+    if (isApplicationEmailRequest(message) && !selectedJob) {
+      return res.json({
+        success: true,
+        reply: `I can generate a professional job application email, but first select a job.
+
+Please do this:
+
+1. Go to Find Real Jobs
+2. Click Apply AI on any job
+3. Then ask me: "Generate email for this job"`,
+      })
+    }
+
+    const systemPrompt = `
+You are JobPilot AI, a professional AI career agent.
+
+Your job is to help users with:
+- Resume generation
+- Resume improvement
+- Cover letters
+- Job application emails
+- Interview preparation
+- Skill improvement plans
+- Career roadmaps
+- Project ideas
+- Job search strategy
+
+Important behavior rules:
+1. Be personal and practical.
+2. Do not give generic low-quality answers.
+3. Use the user's profile details when available.
+4. If the user asks for resume/application but profile details are missing, ask them to complete the profile.
+5. If generating a resume, make it clean, ATS-friendly, and professional.
+6. If generating an email, make it short, clear, human, and not repetitive.
+7. If giving a skill plan, make it step-by-step and realistic.
+8. If preparing interviews, include questions, strong answers, and practice advice.
+9. Do not claim fake experience.
+10. Improve the wording professionally, but stay truthful to the user's details.
+11. Use simple formatting with clear headings.
+
+User Profile:
+Name: ${profile?.name || "Not provided"}
+Target Role: ${profile?.role || "Not provided"}
+Email: ${profile?.email || "Not provided"}
+Phone: ${profile?.phone || "Not provided"}
+Portfolio/GitHub: ${profile?.portfolio || "Not provided"}
+Skills: ${profile?.skills || "Not provided"}
+Experience: ${profile?.experience || "Not provided"}
+Projects: ${profile?.projects || "Not provided"}
+
+Selected Job:
+Title: ${selectedJob?.title || "No selected job"}
+Company: ${selectedJob?.company || "No selected company"}
+Location: ${selectedJob?.location || "No selected location"}
+Salary: ${selectedJob?.salary || "Not listed"}
+Description: ${selectedJob?.description || "No job description available"}
+
+Saved Applications Count: ${savedApplications?.length || 0}
+`
+
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        {
+          role: "user",
+          content: message,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 1600,
+    })
+
+    const reply =
+      completion.choices?.[0]?.message?.content ||
+      "Sorry, I could not generate a response."
+
+    res.json({
+      success: true,
+      reply,
+    })
+  } catch (error) {
+    console.error("❌ AGENT ERROR:")
+    console.error(error)
+
+    res.status(500).json({
+      success: false,
+      reply: "AI agent failed. Please check backend logs.",
+      error: error.message,
+    })
+  }
 })
 
 app.post("/chat", async (req, res) => {
@@ -43,28 +202,19 @@ app.post("/chat", async (req, res) => {
       })
     }
 
-    if (message.toLowerCase().includes("clear memory")) {
-      chatHistory = [
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      messages: [
         {
           role: "system",
           content:
-            "You are JobPilot AI, a friendly career assistant. Help users with jobs, resumes, cover letters, applications, interview preparation, and career planning. Be friendly and helpful.",
+            "You are JobPilot AI, a friendly career assistant. Help users with jobs, resumes, cover letters, applications, interview preparation, and career planning.",
         },
-      ]
-
-      return res.json({
-        reply: "Memory cleared ✅",
-      })
-    }
-
-    chatHistory.push({
-      role: "user",
-      content: message,
-    })
-
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: chatHistory,
+        {
+          role: "user",
+          content: message,
+        },
+      ],
       temperature: 0.7,
       max_tokens: 800,
     })
@@ -72,15 +222,6 @@ app.post("/chat", async (req, res) => {
     const reply =
       completion.choices?.[0]?.message?.content ||
       "Sorry, I could not generate a response."
-
-    chatHistory.push({
-      role: "assistant",
-      content: reply,
-    })
-
-    if (chatHistory.length > 20) {
-      chatHistory = [chatHistory[0], ...chatHistory.slice(-18)]
-    }
 
     res.json({ reply })
   } catch (error) {
@@ -165,13 +306,9 @@ app.get("/jobs", async (req, res) => {
 
 app.post("/send-email", async (req, res) => {
   try {
-    console.log("📩 Resend email request received")
-
     const { to, subject, body } = req.body
 
     if (!to || !subject || !body) {
-      console.log("❌ Missing email fields")
-
       return res.status(400).json({
         success: false,
         error: "Missing to, subject, or body",
@@ -179,15 +316,11 @@ app.post("/send-email", async (req, res) => {
     }
 
     if (!process.env.RESEND_API_KEY) {
-      console.log("❌ Missing RESEND_API_KEY in Render environment")
-
       return res.status(500).json({
         success: false,
         error: "RESEND_API_KEY is missing",
       })
     }
-
-    console.log("📨 Sending email with Resend to:", to)
 
     const { data, error } = await resend.emails.send({
       from: "JobPilot <onboarding@resend.dev>",
@@ -209,8 +342,6 @@ app.post("/send-email", async (req, res) => {
         details: error,
       })
     }
-
-    console.log("✅ Email sent with Resend:", data)
 
     res.json({
       success: true,
