@@ -1,20 +1,10 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 const API_URL =
   import.meta.env.VITE_API_URL || "https://jobpilot-backend-mcv7.onrender.com"
 
-console.log("JOBPILOT API URL:", API_URL)
-
 const emptyProject = { name: "", description: "", tech: "", link: "" }
-
-const emptyEducation = {
-  degree: "",
-  college: "",
-  branch: "",
-  year: "",
-  score: "",
-}
-
+const emptyEducation = { degree: "", college: "", branch: "", year: "", score: "" }
 const emptyExperience = {
   type: "Fresher",
   company: "",
@@ -22,23 +12,9 @@ const emptyExperience = {
   duration: "",
   description: "",
 }
-
-const emptyCertification = {
-  name: "",
-  issuer: "",
-  year: "",
-  link: "",
-}
-
-const emptyAchievement = {
-  title: "",
-  description: "",
-}
-
-const emptyLanguage = {
-  name: "",
-  level: "",
-}
+const emptyCertification = { name: "", issuer: "", year: "", link: "" }
+const emptyAchievement = { title: "", description: "" }
+const emptyLanguage = { name: "", level: "" }
 
 const defaultProfile = {
   name: "Mohammad Haseeb",
@@ -186,6 +162,103 @@ function normalizeProfile(savedProfile) {
   }
 }
 
+function MessageContent({ text }) {
+  const parts = String(text || "").split(/```([\s\S]*?)```/g)
+
+  const copyCode = async (code) => {
+    await navigator.clipboard.writeText(code)
+  }
+
+  return (
+    <div className="space-y-3">
+      {parts.map((part, index) => {
+        const isCode = index % 2 === 1
+
+        if (isCode) {
+          const cleanCode = part.replace(/^[a-zA-Z0-9_-]+\n/, "")
+
+          return (
+            <div
+              key={index}
+              className="bg-[#020617] border border-white/10 rounded-2xl overflow-hidden"
+            >
+              <div className="flex justify-between items-center px-4 py-2 bg-white/5 border-b border-white/10">
+                <span className="text-xs text-gray-400">Code</span>
+                <button
+                  type="button"
+                  onClick={() => copyCode(cleanCode)}
+                  className="text-xs bg-white/10 hover:bg-white/20 px-3 py-1 rounded-lg"
+                >
+                  Copy
+                </button>
+              </div>
+
+              <pre className="p-4 overflow-x-auto text-sm leading-relaxed">
+                <code>{cleanCode}</code>
+              </pre>
+            </div>
+          )
+        }
+
+        return (
+          <p key={index} className="whitespace-pre-line leading-relaxed">
+            {part}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
+
+function AccordionCard({
+  id,
+  title,
+  description,
+  count,
+  children,
+  openProfileSection,
+  setOpenProfileSection,
+  sectionStatus,
+}) {
+  const isOpen = openProfileSection === id
+  const done = sectionStatus[id]
+
+  return (
+    <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpenProfileSection(isOpen ? "" : id)}
+        className="w-full p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 text-left hover:bg-white/5 transition"
+      >
+        <div>
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">{isOpen ? "▾" : "▸"}</span>
+            <h3 className="text-2xl font-bold">{title}</h3>
+            <span
+              className={`text-xs px-3 py-1 rounded-full ${
+                done
+                  ? "bg-green-500/20 text-green-300"
+                  : "bg-yellow-500/20 text-yellow-300"
+              }`}
+            >
+              {done ? "Done" : "Needs info"}
+            </span>
+          </div>
+          <p className="text-gray-400 mt-2">{description}</p>
+        </div>
+
+        {count !== undefined && (
+          <div className="bg-black/30 border border-white/10 rounded-2xl px-4 py-2 text-sm text-gray-300">
+            {count}
+          </div>
+        )}
+      </button>
+
+      {isOpen && <div className="px-6 pb-6">{children}</div>}
+    </div>
+  )
+}
+
 function App() {
   const [profile, setProfile] = useState(() => {
     const saved = localStorage.getItem("jobpilot_profile")
@@ -234,7 +307,12 @@ function App() {
 
   const aiChatRef = useRef(null)
   const aiInputRef = useRef(null)
-  const profileScrollRef = useRef(0)
+  const typingIntervalRef = useRef(null)
+
+  const inputClass =
+    "w-full mt-2 bg-black/30 border border-white/10 rounded-xl p-3 outline-none focus:border-blue-400 transition"
+  const textareaClass =
+    "w-full mt-2 bg-black/30 border border-white/10 rounded-xl p-3 outline-none focus:border-blue-400 transition"
 
   useEffect(() => {
     localStorage.setItem("jobpilot_profile", JSON.stringify(profile))
@@ -260,44 +338,27 @@ function App() {
     })
   }, [aiMessages, aiLoading])
 
-  const inputClass =
-    "w-full mt-2 bg-black/30 border border-white/10 rounded-xl p-3 outline-none focus:border-blue-400 transition"
-  const textareaClass =
-    "w-full mt-2 bg-black/30 border border-white/10 rounded-xl p-3 outline-none focus:border-blue-400 transition"
+  useEffect(() => {
+    return () => {
+      if (typingIntervalRef.current) clearInterval(typingIntervalRef.current)
+    }
+  }, [])
 
   const scrollToSection = (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" })
   }
 
   const updateProfile = (field, value) => {
-    profileScrollRef.current = window.scrollY
-
     setProfile((prev) => ({ ...prev, [field]: value }))
-
-    requestAnimationFrame(() => {
-      window.scrollTo({
-        top: profileScrollRef.current,
-        behavior: "auto",
-      })
-    })
   }
 
   const updateArrayItem = (section, index, field, value) => {
-    profileScrollRef.current = window.scrollY
-
     setProfile((prev) => ({
       ...prev,
       [section]: prev[section].map((item, i) =>
         i === index ? { ...item, [field]: value } : item
       ),
     }))
-
-    requestAnimationFrame(() => {
-      window.scrollTo({
-        top: profileScrollRef.current,
-        behavior: "auto",
-      })
-    })
   }
 
   const addArrayItem = (section, emptyItem) => {
@@ -316,68 +377,90 @@ function App() {
 
   const isFilled = (value) => value && String(value).trim().length > 3
 
-  const projectsText = profile.projects
-    .filter((project) => project.name || project.description)
-    .map(
-      (project, index) =>
-        `Project ${index + 1}: ${project.name}
+  const projectsText = useMemo(() => {
+    return profile.projects
+      .filter((project) => project.name || project.description)
+      .map(
+        (project, index) =>
+          `Project ${index + 1}: ${project.name}
 Description: ${project.description}
 Tech Stack: ${project.tech}
 Link: ${project.link}`
-    )
-    .join("\n\n")
+      )
+      .join("\n\n")
+  }, [profile.projects])
 
-  const educationText = profile.educations
-    .filter((edu) => edu.degree || edu.college)
-    .map(
-      (edu, index) =>
-        `Education ${index + 1}: ${edu.degree}, ${edu.branch}, ${edu.college}, ${edu.year}, ${edu.score}`
-    )
-    .join("\n")
+  const educationText = useMemo(() => {
+    return profile.educations
+      .filter((edu) => edu.degree || edu.college)
+      .map(
+        (edu, index) =>
+          `Education ${index + 1}: ${edu.degree}, ${edu.branch}, ${edu.college}, ${edu.year}, ${edu.score}`
+      )
+      .join("\n")
+  }, [profile.educations])
 
-  const experienceText = profile.experiences
-    .filter((exp) => exp.type || exp.description || exp.company)
-    .map(
-      (exp, index) =>
-        `Experience ${index + 1}: ${exp.type}
+  const experienceText = useMemo(() => {
+    return profile.experiences
+      .filter((exp) => exp.type || exp.description || exp.company)
+      .map(
+        (exp, index) =>
+          `Experience ${index + 1}: ${exp.type}
 Company: ${exp.company}
 Role: ${exp.role}
 Duration: ${exp.duration}
 Description: ${exp.description}`
-    )
-    .join("\n\n")
+      )
+      .join("\n\n")
+  }, [profile.experiences])
 
-  const certificationText = profile.certifications
-    .filter((cert) => cert.name)
-    .map(
-      (cert, index) =>
-        `Certification ${index + 1}: ${cert.name}, ${cert.issuer}, ${cert.year}, ${cert.link}`
-    )
-    .join("\n")
+  const certificationText = useMemo(() => {
+    return profile.certifications
+      .filter((cert) => cert.name)
+      .map(
+        (cert, index) =>
+          `Certification ${index + 1}: ${cert.name}, ${cert.issuer}, ${cert.year}, ${cert.link}`
+      )
+      .join("\n")
+  }, [profile.certifications])
 
-  const achievementText = profile.achievements
-    .filter((ach) => ach.title || ach.description)
-    .map(
-      (ach, index) =>
-        `Achievement ${index + 1}: ${ach.title} - ${ach.description}`
-    )
-    .join("\n")
+  const achievementText = useMemo(() => {
+    return profile.achievements
+      .filter((ach) => ach.title || ach.description)
+      .map(
+        (ach, index) =>
+          `Achievement ${index + 1}: ${ach.title} - ${ach.description}`
+      )
+      .join("\n")
+  }, [profile.achievements])
 
-  const languageText = profile.languages
-    .filter((lang) => lang.name)
-    .map((lang) => `${lang.name}${lang.level ? ` - ${lang.level}` : ""}`)
-    .join(", ")
+  const languageText = useMemo(() => {
+    return profile.languages
+      .filter((lang) => lang.name)
+      .map((lang) => `${lang.name}${lang.level ? ` - ${lang.level}` : ""}`)
+      .join(", ")
+  }, [profile.languages])
 
-  const profileForAI = {
-    ...profile,
-    skills: profile.technicalSkills,
-    experience: experienceText,
-    projects: projectsText,
-    education: educationText,
-    certificationsText: certificationText,
-    achievementsText: achievementText,
-    languagesText: languageText,
-  }
+  const profileForAI = useMemo(() => {
+    return {
+      ...profile,
+      skills: profile.technicalSkills,
+      experience: experienceText,
+      projects: projectsText,
+      education: educationText,
+      certificationsText: certificationText,
+      achievementsText: achievementText,
+      languagesText: languageText,
+    }
+  }, [
+    profile,
+    experienceText,
+    projectsText,
+    educationText,
+    certificationText,
+    achievementText,
+    languageText,
+  ])
 
   const sectionStatus = {
     personal:
@@ -405,6 +488,10 @@ Description: ${exp.description}`
   const totalSections = Object.keys(sectionStatus).length
   const profileScore = Math.round((completedSections / totalSections) * 100)
 
+  const getMainProject = () => {
+    return profile.projects.find((project) => project.name) || emptyProject
+  }
+
   const calculateMatch = (job) => {
     const skills = profile.technicalSkills
       .toLowerCase()
@@ -413,7 +500,6 @@ Description: ${exp.description}`
       .filter(Boolean)
 
     const text = `${job.title || ""} ${job.description || ""}`.toLowerCase()
-
     let score = 40
 
     skills.forEach((skill) => {
@@ -469,10 +555,6 @@ Description: ${exp.description}`
     setLoadingJobs(false)
   }
 
-  const getMainProject = () => {
-    return profile.projects.find((project) => project.name) || emptyProject
-  }
-
   const buildApplicationPack = (job) => {
     const mainProject = getMainProject()
 
@@ -502,10 +584,7 @@ ${profile.portfolio}`
 6. Keep resume clean and one page if applying as fresher.
 7. Add portfolio/GitHub link near contact details.`
 
-    return {
-      coverLetter,
-      resumeTips,
-    }
+    return { coverLetter, resumeTips }
   }
 
   const buildEmailDraft = (job) => {
@@ -570,6 +649,40 @@ ${profile.phone}`,
     setTimeout(() => scrollToSection("workspace"), 200)
   }
 
+  const typeAiResponse = (reply) => {
+    if (typingIntervalRef.current) {
+      clearInterval(typingIntervalRef.current)
+    }
+
+    let index = 0
+    const finalReply = String(reply || "")
+
+    setAiMessages((prev) => [...prev, { role: "ai", text: "" }])
+
+    typingIntervalRef.current = setInterval(() => {
+      index += 4
+
+      setAiMessages((prev) => {
+        const updated = [...prev]
+        updated[updated.length - 1] = {
+          role: "ai",
+          text: finalReply.slice(0, index),
+        }
+        return updated
+      })
+
+      aiChatRef.current?.scrollTo({
+        top: aiChatRef.current.scrollHeight,
+        behavior: "smooth",
+      })
+
+      if (index >= finalReply.length) {
+        clearInterval(typingIntervalRef.current)
+        typingIntervalRef.current = null
+      }
+    }, 15)
+  }
+
   const askAgent = async (messageText) => {
     const cleanMessage = messageText.trim()
     if (!cleanMessage) return
@@ -614,16 +727,11 @@ ${profile.phone}`,
         throw new Error(data.reply || data.error || "AI agent failed")
       }
 
-      setAiMessages((prev) => [...prev, { role: "ai", text: data.reply }])
-
-      setTimeout(() => {
-        aiChatRef.current?.scrollTo({
-          top: aiChatRef.current.scrollHeight,
-          behavior: "smooth",
-        })
-      }, 100)
+      setAiLoading(false)
+      typeAiResponse(data.reply)
     } catch (error) {
       console.error("AI agent frontend error:", error)
+      setAiLoading(false)
 
       setAiMessages((prev) => [
         ...prev,
@@ -633,8 +741,6 @@ ${profile.phone}`,
         },
       ])
     } finally {
-      setAiLoading(false)
-
       setTimeout(() => {
         aiInputRef.current?.focus()
       }, 100)
@@ -780,6 +886,11 @@ ${profile.phone}`,
   }
 
   const clearAiChat = () => {
+    if (typingIntervalRef.current) {
+      clearInterval(typingIntervalRef.current)
+      typingIntervalRef.current = null
+    }
+
     setAiMessages([
       {
         role: "ai",
@@ -795,43 +906,10 @@ ${profile.phone}`,
     }, 100)
   }
 
-  const AccordionCard = ({ id, title, description, count, children }) => {
-    const isOpen = openProfileSection === id
-    const done = sectionStatus[id]
-
-    return (
-      <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden">
-        <button
-          onClick={() => setOpenProfileSection(isOpen ? "" : id)}
-          className="w-full p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 text-left hover:bg-white/5 transition"
-        >
-          <div>
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">{isOpen ? "▾" : "▸"}</span>
-              <h3 className="text-2xl font-bold">{title}</h3>
-              <span
-                className={`text-xs px-3 py-1 rounded-full ${
-                  done
-                    ? "bg-green-500/20 text-green-300"
-                    : "bg-yellow-500/20 text-yellow-300"
-                }`}
-              >
-                {done ? "Done" : "Needs info"}
-              </span>
-            </div>
-            <p className="text-gray-400 mt-2">{description}</p>
-          </div>
-
-          {count !== undefined && (
-            <div className="bg-black/30 border border-white/10 rounded-2xl px-4 py-2 text-sm text-gray-300">
-              {count}
-            </div>
-          )}
-        </button>
-
-        {isOpen && <div className="px-6 pb-6">{children}</div>}
-      </div>
-    )
+  const accordionProps = {
+    openProfileSection,
+    setOpenProfileSection,
+    sectionStatus,
   }
 
   return (
@@ -846,34 +924,19 @@ ${profile.phone}`,
           </h1>
 
           <div className="hidden md:flex gap-6 text-gray-300">
-            <button
-              onClick={() => scrollToSection("jobs")}
-              className="hover:text-white"
-            >
+            <button onClick={() => scrollToSection("jobs")} className="hover:text-white">
               Jobs
             </button>
-            <button
-              onClick={() => scrollToSection("ai-agent")}
-              className="hover:text-white"
-            >
+            <button onClick={() => scrollToSection("ai-agent")} className="hover:text-white">
               AI
             </button>
-            <button
-              onClick={() => scrollToSection("workspace")}
-              className="hover:text-white"
-            >
+            <button onClick={() => scrollToSection("workspace")} className="hover:text-white">
               Apply
             </button>
-            <button
-              onClick={() => scrollToSection("tracker")}
-              className="hover:text-white"
-            >
+            <button onClick={() => scrollToSection("tracker")} className="hover:text-white">
               Tracker
             </button>
-            <button
-              onClick={() => scrollToSection("profile")}
-              className="hover:text-white"
-            >
+            <button onClick={() => scrollToSection("profile")} className="hover:text-white">
               Profile
             </button>
           </div>
@@ -893,12 +956,13 @@ ${profile.phone}`,
 
             <p className="text-gray-400 text-xl leading-relaxed mb-8">
               JobPilot helps candidates create resume details, search jobs,
-              generate professional resumes, improve skills, prepare for
-              interviews, and open Gmail-ready job emails.
+              generate professional resumes, improve skills, prepare for interviews,
+              and open Gmail-ready job emails.
             </p>
 
             <div className="flex flex-wrap gap-4">
               <button
+                type="button"
                 onClick={() => scrollToSection("profile")}
                 className="bg-green-600 hover:bg-green-700 px-7 py-4 rounded-2xl font-semibold"
               >
@@ -906,6 +970,7 @@ ${profile.phone}`,
               </button>
 
               <button
+                type="button"
                 onClick={() => scrollToSection("ai-agent")}
                 className="bg-purple-600 hover:bg-purple-700 px-7 py-4 rounded-2xl font-semibold"
               >
@@ -913,6 +978,7 @@ ${profile.phone}`,
               </button>
 
               <button
+                type="button"
                 onClick={() => scrollToSection("jobs")}
                 className="bg-blue-600 hover:bg-blue-700 px-7 py-4 rounded-2xl font-semibold"
               >
@@ -934,9 +1000,7 @@ ${profile.phone}`,
 
             <div className="bg-white/5 border border-white/10 rounded-3xl p-6">
               <p className="text-gray-400">Projects</p>
-              <h3 className="text-5xl font-bold mt-3">
-                {profile.projects.length}
-              </h3>
+              <h3 className="text-5xl font-bold mt-3">{profile.projects.length}</h3>
             </div>
 
             <div className="bg-white/5 border border-white/10 rounded-3xl p-6">
@@ -951,14 +1015,11 @@ ${profile.phone}`,
 
       <section id="ai-agent" className="max-w-7xl mx-auto px-6 py-16">
         <div className="mb-10">
-          <p className="text-purple-400 font-semibold mb-3">
-            JobPilot AI Agent
-          </p>
+          <p className="text-purple-400 font-semibold mb-3">JobPilot AI Agent</p>
           <h2 className="text-5xl font-bold mb-4">Ask AI Anything</h2>
           <p className="text-gray-400 text-lg">
-            Generate resumes, improve skills, prepare for interviews, create job
-            emails, and get personal career guidance using your candidate
-            details.
+            Generate resumes, improve skills, prepare for interviews, create job emails,
+            and get personal career guidance using your candidate details.
           </p>
         </div>
 
@@ -968,6 +1029,7 @@ ${profile.phone}`,
 
             <div className="space-y-3">
               <button
+                type="button"
                 onClick={() =>
                   quickAskAgent(
                     "Generate my professional ATS-friendly resume using all my candidate profile details. Make it clean, truthful, strong, and suitable for my target role. Include summary, skills, education, projects, experience, certifications, achievements, and languages if available."
@@ -979,6 +1041,7 @@ ${profile.phone}`,
               </button>
 
               <button
+                type="button"
                 onClick={() =>
                   quickAskAgent(
                     "Check my candidate profile and tell me what resume details are missing or weak. Give exact improvements."
@@ -990,6 +1053,7 @@ ${profile.phone}`,
               </button>
 
               <button
+                type="button"
                 onClick={() =>
                   quickAskAgent(
                     "Create a personalized 30-day skill improvement roadmap for my target role based on my current skills, education, and projects."
@@ -1001,6 +1065,7 @@ ${profile.phone}`,
               </button>
 
               <button
+                type="button"
                 onClick={() =>
                   quickAskAgent(
                     "Prepare me for interviews for my target role. Give common questions, strong sample answers, and practice advice based on my skills and projects."
@@ -1012,6 +1077,7 @@ ${profile.phone}`,
               </button>
 
               <button
+                type="button"
                 onClick={() =>
                   quickAskAgent(
                     "Generate a short professional application email for the selected job using my full candidate profile. Make it human, clean, and not repetitive."
@@ -1023,6 +1089,7 @@ ${profile.phone}`,
               </button>
 
               <button
+                type="button"
                 onClick={clearAiChat}
                 className="w-full bg-red-500/20 hover:bg-red-500/30 py-3 px-4 rounded-xl text-left font-semibold text-red-200"
               >
@@ -1039,7 +1106,7 @@ ${profile.phone}`,
               {aiMessages.map((msg, index) => (
                 <div
                   key={index}
-                  className={`rounded-2xl p-4 whitespace-pre-line leading-relaxed ${
+                  className={`rounded-2xl p-4 leading-relaxed ${
                     msg.role === "user"
                       ? "bg-blue-600/20 border border-blue-400/20 ml-10"
                       : "bg-black/30 border border-white/10 mr-10"
@@ -1048,7 +1115,10 @@ ${profile.phone}`,
                   <p className="text-xs uppercase tracking-wide text-gray-400 mb-2">
                     {msg.role === "user" ? "You" : "JobPilot AI"}
                   </p>
-                  <p className="text-gray-100">{msg.text}</p>
+
+                  <div className="text-gray-100">
+                    <MessageContent text={msg.text} />
+                  </div>
                 </div>
               ))}
 
@@ -1076,6 +1146,7 @@ ${profile.phone}`,
               />
 
               <button
+                type="button"
                 onClick={() => askAgent(aiInput)}
                 disabled={aiLoading}
                 className="bg-purple-600 hover:bg-purple-700 px-8 rounded-2xl font-semibold disabled:opacity-50"
@@ -1086,6 +1157,7 @@ ${profile.phone}`,
 
             <div className="flex flex-wrap gap-3 mt-4">
               <button
+                type="button"
                 onClick={() => {
                   const lastAi = [...aiMessages]
                     .reverse()
@@ -1100,6 +1172,7 @@ ${profile.phone}`,
               </button>
 
               <button
+                type="button"
                 onClick={useLastAiAsEmail}
                 className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl text-sm"
               >
@@ -1160,6 +1233,7 @@ ${profile.phone}`,
           </div>
 
           <button
+            type="button"
             onClick={findJobs}
             disabled={loadingJobs}
             className="bg-blue-600 hover:bg-blue-700 rounded-2xl font-bold disabled:opacity-50"
@@ -1203,6 +1277,7 @@ ${profile.phone}`,
 
               <div className="grid grid-cols-2 gap-3">
                 <button
+                  type="button"
                   onClick={() => window.open(job.url, "_blank")}
                   className="bg-white/10 hover:bg-white/20 py-3 rounded-xl"
                 >
@@ -1210,6 +1285,7 @@ ${profile.phone}`,
                 </button>
 
                 <button
+                  type="button"
                   onClick={() => applyWithAI(job)}
                   className="bg-green-600 hover:bg-green-700 py-3 rounded-xl font-semibold"
                 >
@@ -1252,6 +1328,7 @@ ${profile.phone}`,
               </div>
 
               <button
+                type="button"
                 onClick={() => window.open(selectedJob.url, "_blank")}
                 className="w-full mt-6 bg-white/10 hover:bg-white/20 py-3 rounded-xl"
               >
@@ -1300,6 +1377,7 @@ ${profile.phone}`,
 
                 <div className="grid md:grid-cols-3 gap-4 mt-5">
                   <button
+                    type="button"
                     onClick={openInGmail}
                     className="bg-blue-600 hover:bg-blue-700 py-4 rounded-xl font-semibold"
                   >
@@ -1307,6 +1385,7 @@ ${profile.phone}`,
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => {
                       setSelectedJob((prev) => ({
                         ...prev,
@@ -1328,6 +1407,7 @@ ${profile.phone}`,
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => {
                       setSelectedJob(null)
                       setApplicationPack(null)
@@ -1353,6 +1433,7 @@ ${profile.phone}`,
                   <div className="flex justify-between mb-4">
                     <h3 className="text-xl font-bold">Cover Letter</h3>
                     <button
+                      type="button"
                       onClick={() =>
                         copyToClipboard(applicationPack.coverLetter, "cover")
                       }
@@ -1370,6 +1451,7 @@ ${profile.phone}`,
                   <div className="flex justify-between mb-4">
                     <h3 className="text-xl font-bold">Resume Tips</h3>
                     <button
+                      type="button"
                       onClick={() =>
                         copyToClipboard(applicationPack.resumeTips, "tips")
                       }
@@ -1400,6 +1482,7 @@ ${profile.phone}`,
 
           <div className="flex gap-3">
             <button
+              type="button"
               onClick={exportTrackerCSV}
               className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-2xl font-semibold"
             >
@@ -1407,6 +1490,7 @@ ${profile.phone}`,
             </button>
 
             <button
+              type="button"
               onClick={clearTracker}
               className="bg-red-500/20 hover:bg-red-500/30 border border-red-400/20 px-5 py-3 rounded-2xl font-semibold text-red-200"
             >
@@ -1452,6 +1536,7 @@ ${profile.phone}`,
 
                 <div className="grid grid-cols-3 gap-3 mt-5">
                   <button
+                    type="button"
                     onClick={() => {
                       const pack = buildApplicationPack(job)
                       setSelectedJob(job)
@@ -1467,6 +1552,7 @@ ${profile.phone}`,
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => window.open(job.url, "_blank")}
                     className="bg-white/10 hover:bg-white/20 py-3 rounded-xl"
                   >
@@ -1474,6 +1560,7 @@ ${profile.phone}`,
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => removeApplication(index)}
                     className="bg-red-500/20 hover:bg-red-500/30 py-3 rounded-xl"
                   >
@@ -1513,6 +1600,7 @@ ${profile.phone}`,
             </div>
 
             <button
+              type="button"
               onClick={() =>
                 quickAskAgent(
                   "Check my candidate profile and tell me what resume details are missing or weak. Give exact improvements."
@@ -1524,6 +1612,7 @@ ${profile.phone}`,
             </button>
 
             <button
+              type="button"
               onClick={() =>
                 quickAskAgent(
                   "Generate my professional ATS-friendly resume using all my candidate profile details. Make it clean, truthful, strong, and suitable for my target role."
@@ -1561,6 +1650,7 @@ ${profile.phone}`,
                 ["preferences", "Preferences"],
               ].map(([id, label]) => (
                 <button
+                  type="button"
                   key={id}
                   onClick={() => setOpenProfileSection(id)}
                   className={`w-full flex justify-between items-center px-4 py-3 rounded-xl text-left transition ${
@@ -1581,6 +1671,9 @@ ${profile.phone}`,
               id="personal"
               title="Personal Details"
               description="Basic identity and contact details."
+              openProfileSection={openProfileSection}
+              setOpenProfileSection={setOpenProfileSection}
+              sectionStatus={sectionStatus}
             >
               <div className="grid md:grid-cols-2 gap-5">
                 {[
@@ -1609,6 +1702,9 @@ ${profile.phone}`,
               id="summary"
               title="Professional Summary"
               description="Short summary about the candidate."
+              openProfileSection={openProfileSection}
+              setOpenProfileSection={setOpenProfileSection}
+              sectionStatus={sectionStatus}
             >
               <textarea
                 value={profile.summary}
@@ -1622,6 +1718,9 @@ ${profile.phone}`,
               id="skills"
               title="Skills"
               description="Technical skills, soft skills, and tools."
+              openProfileSection={openProfileSection}
+              setOpenProfileSection={setOpenProfileSection}
+              sectionStatus={sectionStatus}
             >
               <div className="grid md:grid-cols-3 gap-5">
                 <div>
@@ -1669,6 +1768,9 @@ ${profile.phone}`,
               title="Education"
               description="Add one or more education records."
               count={`${profile.educations.length} item(s)`}
+              openProfileSection={openProfileSection}
+              setOpenProfileSection={setOpenProfileSection}
+              sectionStatus={sectionStatus}
             >
               <div className="space-y-5">
                 {profile.educations.map((edu, index) => (
@@ -1682,6 +1784,7 @@ ${profile.phone}`,
                       </h4>
                       {profile.educations.length > 1 && (
                         <button
+                          type="button"
                           onClick={() => removeArrayItem("educations", index)}
                           className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
                         >
@@ -1721,6 +1824,7 @@ ${profile.phone}`,
                 ))}
 
                 <button
+                  type="button"
                   onClick={() => addArrayItem("educations", emptyEducation)}
                   className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
                 >
@@ -1734,6 +1838,9 @@ ${profile.phone}`,
               title="Projects"
               description="Add portfolio projects with tech stack and links."
               count={`${profile.projects.length} item(s)`}
+              openProfileSection={openProfileSection}
+              setOpenProfileSection={setOpenProfileSection}
+              sectionStatus={sectionStatus}
             >
               <div className="space-y-5">
                 {profile.projects.map((project, index) => (
@@ -1747,6 +1854,7 @@ ${profile.phone}`,
                       </h4>
                       {profile.projects.length > 1 && (
                         <button
+                          type="button"
                           onClick={() => removeArrayItem("projects", index)}
                           className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
                         >
@@ -1834,6 +1942,7 @@ ${profile.phone}`,
                 ))}
 
                 <button
+                  type="button"
                   onClick={() => addArrayItem("projects", emptyProject)}
                   className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
                 >
@@ -1847,6 +1956,9 @@ ${profile.phone}`,
               title="Experience"
               description="Add internships, jobs, freelance, or practical experience."
               count={`${profile.experiences.length} item(s)`}
+              openProfileSection={openProfileSection}
+              setOpenProfileSection={setOpenProfileSection}
+              sectionStatus={sectionStatus}
             >
               <div className="space-y-5">
                 {profile.experiences.map((exp, index) => (
@@ -1860,6 +1972,7 @@ ${profile.phone}`,
                       </h4>
                       {profile.experiences.length > 1 && (
                         <button
+                          type="button"
                           onClick={() => removeArrayItem("experiences", index)}
                           className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
                         >
@@ -1939,6 +2052,7 @@ ${profile.phone}`,
                 ))}
 
                 <button
+                  type="button"
                   onClick={() => addArrayItem("experiences", emptyExperience)}
                   className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
                 >
@@ -1952,6 +2066,9 @@ ${profile.phone}`,
               title="Certifications"
               description="Add certifications, course completions, and credentials."
               count={`${profile.certifications.length} item(s)`}
+              openProfileSection={openProfileSection}
+              setOpenProfileSection={setOpenProfileSection}
+              sectionStatus={sectionStatus}
             >
               <div className="space-y-5">
                 {profile.certifications.map((cert, index) => (
@@ -1964,6 +2081,7 @@ ${profile.phone}`,
                         Certification {index + 1}
                       </h4>
                       <button
+                        type="button"
                         onClick={() =>
                           removeArrayItem("certifications", index)
                         }
@@ -2003,6 +2121,7 @@ ${profile.phone}`,
                 ))}
 
                 <button
+                  type="button"
                   onClick={() =>
                     addArrayItem("certifications", emptyCertification)
                   }
@@ -2018,6 +2137,9 @@ ${profile.phone}`,
               title="Achievements"
               description="Add awards, hackathons, academic or coding achievements."
               count={`${profile.achievements.length} item(s)`}
+              openProfileSection={openProfileSection}
+              setOpenProfileSection={setOpenProfileSection}
+              sectionStatus={sectionStatus}
             >
               <div className="space-y-5">
                 {profile.achievements.map((achievement, index) => (
@@ -2030,6 +2152,7 @@ ${profile.phone}`,
                         Achievement {index + 1}
                       </h4>
                       <button
+                        type="button"
                         onClick={() => removeArrayItem("achievements", index)}
                         className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
                       >
@@ -2077,6 +2200,7 @@ ${profile.phone}`,
                 ))}
 
                 <button
+                  type="button"
                   onClick={() =>
                     addArrayItem("achievements", emptyAchievement)
                   }
@@ -2092,6 +2216,9 @@ ${profile.phone}`,
               title="Languages"
               description="Add languages and proficiency levels."
               count={`${profile.languages.length} item(s)`}
+              openProfileSection={openProfileSection}
+              setOpenProfileSection={setOpenProfileSection}
+              sectionStatus={sectionStatus}
             >
               <div className="space-y-5">
                 {profile.languages.map((language, index) => (
@@ -2105,6 +2232,7 @@ ${profile.phone}`,
                       </h4>
                       {profile.languages.length > 1 && (
                         <button
+                          type="button"
                           onClick={() => removeArrayItem("languages", index)}
                           className="bg-red-500/20 hover:bg-red-500/30 px-3 py-2 rounded-xl text-red-200"
                         >
@@ -2153,6 +2281,7 @@ ${profile.phone}`,
                 ))}
 
                 <button
+                  type="button"
                   onClick={() => addArrayItem("languages", emptyLanguage)}
                   className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-semibold"
                 >
@@ -2165,6 +2294,9 @@ ${profile.phone}`,
               id="preferences"
               title="Resume Preferences"
               description="Resume style and job preferences."
+              openProfileSection={openProfileSection}
+              setOpenProfileSection={setOpenProfileSection}
+              sectionStatus={sectionStatus}
             >
               <div className="grid md:grid-cols-2 gap-5">
                 <div>
