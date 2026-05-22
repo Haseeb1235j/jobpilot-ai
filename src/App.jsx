@@ -171,15 +171,13 @@ ${profile.name}`
 
 1. Review the job page.
 2. Update resume for this job.
-3. Copy/edit the cover letter.
-4. Copy/edit the recruiter message.
-5. Generate email draft.
-6. Enter recipient email.
-7. Open in Gmail.
-8. Review the email inside Gmail.
-9. Click Send manually from your Gmail.
-10. Mark job as Applied.
-11. Follow up after 3 to 5 days.`
+3. Review the generated email.
+4. Enter recipient email.
+5. Click Open in Gmail.
+6. Review the email inside Gmail.
+7. Click Send manually from your Gmail.
+8. Mark job as Applied.
+9. Follow up after 3 to 5 days.`
 
     return {
       coverLetter,
@@ -190,32 +188,30 @@ ${profile.name}`
   }
 
   const buildEmailDraft = (job, pack) => {
+    const projectLine = profile.projects
+      ? `One of my key projects is ${profile.projects.split(",")[0].trim()}, where I gained practical experience in frontend development, backend integration, and real-world user workflows.`
+      : "I have worked on practical projects that helped me improve my frontend development and problem-solving skills."
+
     return {
       subject: `Application for ${job.title} - ${profile.name}`,
       body: `Dear Hiring Manager,
 
 I hope you are doing well.
 
-I am writing to apply for the ${job.title} position at ${job.company}. I am interested in this opportunity because it matches my career goal of growing as a ${profile.role}.
+I am writing to apply for the ${job.title} position at ${job.company}. I have experience working with ${profile.skills}, and I am interested in this opportunity because it matches my goal of growing as a ${profile.role}.
 
-Here are a few highlights from my profile:
+${projectLine}
 
-- Skills: ${profile.skills}
-- Projects: ${profile.projects}
-- Experience: ${profile.experience}
-- Portfolio/GitHub: ${profile.portfolio}
+I am a quick learner, motivated to improve, and excited to contribute to your team.
 
-Cover letter:
+Portfolio/GitHub: ${profile.portfolio}
 
-${pack.coverLetter}
-
-Thank you for your time and consideration. I would be grateful for the opportunity to discuss how my skills and projects can contribute to ${job.company}.
+Thank you for your time and consideration. I would be happy to discuss how my skills and projects match this opportunity.
 
 Best regards,
 ${profile.name}
 ${profile.email}
-${profile.phone}
-${profile.portfolio}`,
+${profile.phone}`,
     }
   }
 
@@ -283,6 +279,25 @@ ${profile.portfolio}`,
 
     window.open(gmailUrl, "_blank")
     setEmailStatus("Gmail opened ✅ Review and click Send in Gmail.")
+
+    setSelectedJob((prev) => ({
+      ...prev,
+      status: "Ready",
+      note: "Opened in Gmail",
+    }))
+
+    setSavedApplications((prev) =>
+      prev.map((job) =>
+        job.title === selectedJob.title &&
+        job.company === selectedJob.company &&
+        job.location === selectedJob.location
+          ? {
+              ...job,
+              note: `Opened Gmail draft for ${recipientEmail}`,
+            }
+          : job
+      )
+    )
   }
 
   const copyToClipboard = async (text, key) => {
