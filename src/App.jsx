@@ -163,25 +163,13 @@ function cleanFileName(name) {
     .toLowerCase()
 }
 
-function getDocumentTitle(text, profile) {
-  const lower = String(text || "").toLowerCase()
-
-  if (
-    lower.includes("professional summary") ||
-    lower.includes("technical skills") ||
-    lower.includes("education") ||
-    lower.includes("projects") ||
-    lower.includes("resume")
-  ) {
+function getDocumentTitle(text, profile, documentType = "response") {
+  if (documentType === "resume") {
     return `${profile?.name || "Candidate"} Resume`
   }
 
-  if (
-    lower.includes("dear hiring manager") ||
-    lower.includes("cover letter") ||
-    lower.includes("best regards")
-  ) {
-    return `${profile?.name || "Candidate"} Cover Letter`
+  if (documentType === "letter") {
+    return `${profile?.name || "Candidate"} Application Letter`
   }
 
   return "JobPilot AI Response"
@@ -395,13 +383,18 @@ function buildCleanResumeHtml(profile) {
   `
 }
 
-function getProfessionalDocumentHtml(text, profile, template = "classic-photo") {
-  const title = getDocumentTitle(text, profile)
-  const isResume = title.toLowerCase().includes("resume")
+function getProfessionalDocumentHtml(
+  text,
+  profile,
+  template = "classic-photo",
+  documentType = "response"
+) {
+  const title = getDocumentTitle(text, profile, documentType)
+  const isResume = documentType === "resume"
+  const isLetter = documentType === "letter"
 
   const resumeBody = buildCleanResumeHtml(profile)
   const normalBody = markdownToProfessionalHtml(text)
-  const bodyContent = isResume ? resumeBody : `<p>${normalBody}</p>`
 
   if (template === "modern-sidebar" && isResume) {
     return `
@@ -502,6 +495,74 @@ function getProfessionalDocumentHtml(text, profile, template = "classic-photo") 
 </html>`
   }
 
+  if (isLetter) {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body{margin:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;color:#111827}
+    .page{max-width:800px;margin:24px auto;background:white;padding:46px 56px;box-shadow:0 18px 45px rgba(15,23,42,.14)}
+    .letter-header{text-align:left;border-bottom:3px solid #1f4e79;padding-bottom:14px;margin-bottom:24px}
+    .letter-header h1{margin:0 0 6px;font-size:25px;color:#1f4e79;text-transform:uppercase}
+    .letter-header p{font-size:12.5px;color:#374151;margin:3px 0}
+    .letter-body p{font-size:13.5px;line-height:1.75;margin:0 0 13px}
+    h2,h3{color:#1f4e79}
+    strong{color:#111827}
+    @media print{body{background:white}.page{box-shadow:none;margin:0;max-width:none;padding:36px 44px}.no-print{display:none!important}}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="letter-header">
+      <h1>${escapeHtml(profile?.name || "Candidate Name")}</h1>
+      <p>${escapeHtml(profile?.email || "Email not provided")} | ${escapeHtml(profile?.phone || "Phone not provided")}</p>
+      <p>${escapeHtml(profile?.location || "Location not provided")}</p>
+    </div>
+    <div class="letter-body">
+      <p>${normalBody}</p>
+    </div>
+  </div>
+</body>
+</html>`
+  }
+
+  if (!isResume) {
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body{margin:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;color:#111827}
+    .page{max-width:850px;margin:24px auto;background:white;padding:42px 50px;border-radius:14px;box-shadow:0 18px 45px rgba(15,23,42,.14)}
+    .doc-header{border-bottom:3px solid #7c3aed;padding-bottom:12px;margin-bottom:22px}
+    .doc-header h1{font-size:26px;margin:0;color:#111827}
+    .doc-header p{font-size:12px;color:#6b7280;margin:5px 0 0}
+    h2{font-size:17px;color:#111827;margin:22px 0 10px;border-bottom:1px solid #e5e7eb;padding-bottom:6px}
+    h3{font-size:15px;color:#111827;margin:16px 0 8px}
+    p,li{font-size:13.5px;line-height:1.68;margin:0 0 10px}
+    ul{margin:0 0 12px;padding-left:20px}
+    li{margin-bottom:5px}
+    strong{color:#111827}
+    @media print{body{background:white}.page{box-shadow:none;margin:0;max-width:none;border-radius:0;padding:34px 42px}.no-print{display:none!important}}
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="doc-header">
+      <h1>JobPilot AI Response</h1>
+      <p>Generated career guidance</p>
+    </div>
+    <p>${normalBody}</p>
+  </div>
+</body>
+</html>`
+  }
+
   return `
 <!DOCTYPE html>
 <html>
@@ -532,7 +593,7 @@ function getProfessionalDocumentHtml(text, profile, template = "classic-photo") 
   </style>
 </head>
 <body>
-  <div class="page">${bodyContent}</div>
+  <div class="page">${resumeBody}</div>
 </body>
 </html>`
 }
@@ -717,7 +778,7 @@ function TemplateSelector({ selectedResumeTemplate, setSelectedResumeTemplate })
         <div>
           <h3 className="text-lg font-bold">Choose Resume Template</h3>
           <p className="text-sm text-gray-400">
-            Pick a professional style before exporting PDF or DOC.
+            Templates only apply when exporting resume documents.
           </p>
         </div>
 
@@ -903,14 +964,20 @@ function App() {
 
   const [copied, setCopied] = useState("")
 
-  const [aiMessages, setAiMessages] = useState(() =>
-    safeParse(localStorage.getItem("jobpilot_ai_messages"), [
+  const [aiMessages, setAiMessages] = useState(() => {
+    const savedMessages = safeParse(localStorage.getItem("jobpilot_ai_messages"), [
       {
         role: "ai",
         text: "Hi 👋 I am JobPilot AI. Fill your candidate details, then ask me to generate a professional resume, improve your skills, prepare for interviews, or write a job application email.",
+        docType: "response",
       },
     ])
-  )
+
+    return savedMessages.map((msg) => ({
+      ...msg,
+      docType: msg.docType || "response",
+    }))
+  })
 
   const [aiInput, setAiInput] = useState("")
   const [aiLoading, setAiLoading] = useState(false)
@@ -1296,11 +1363,12 @@ ${profile.phone}`,
     setTimeout(() => setCopied(""), 1500)
   }
 
-  const exportMessageAsPdf = (text) => {
+  const exportMessageAsPdf = (text, documentType = "response") => {
     const html = getProfessionalDocumentHtml(
       text,
       profile,
-      selectedResumeTemplate
+      selectedResumeTemplate,
+      documentType
     )
 
     const printPage = `
@@ -1308,7 +1376,7 @@ ${profile.phone}`,
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Export Resume</title>
+  <title>Export Document</title>
   <style>
     body{margin:0;background:#0f172a;font-family:Arial,Helvetica,sans-serif}
     .toolbar{position:sticky;top:0;z-index:9999;background:#0f172a;color:white;padding:12px 18px;display:flex;justify-content:center;gap:12px;border-bottom:1px solid rgba(255,255,255,.12)}
@@ -1340,13 +1408,15 @@ ${profile.phone}`,
     setTimeout(() => URL.revokeObjectURL(url), 10000)
   }
 
-  const exportMessageAsDoc = (text) => {
+  const exportMessageAsDoc = (text, documentType = "response") => {
     const html = getProfessionalDocumentHtml(
       text,
       profile,
-      selectedResumeTemplate
+      selectedResumeTemplate,
+      documentType
     )
-    const title = cleanFileName(getDocumentTitle(text, profile))
+
+    const title = cleanFileName(getDocumentTitle(text, profile, documentType))
 
     const blob = new Blob([html], {
       type: "application/msword;charset=utf-8",
@@ -1365,16 +1435,25 @@ ${profile.phone}`,
   }
 
   const getLatestAiMessage = () => {
-    return [...aiMessages].reverse().find((msg) => msg.role === "ai" && msg.text)
+    return [...aiMessages]
+      .reverse()
+      .find((msg) => msg.role === "ai" && msg.text)
   }
 
-  const typeAiResponse = (reply) => {
+  const typeAiResponse = (reply, documentType = "response") => {
     if (typingIntervalRef.current) clearInterval(typingIntervalRef.current)
 
     let index = 0
     const finalReply = String(reply || "")
 
-    setAiMessages((prev) => [...prev, { role: "ai", text: "" }])
+    setAiMessages((prev) => [
+      ...prev,
+      {
+        role: "ai",
+        text: "",
+        docType: documentType,
+      },
+    ])
 
     typingIntervalRef.current = setInterval(() => {
       index += 4
@@ -1382,8 +1461,9 @@ ${profile.phone}`,
       setAiMessages((prev) => {
         const updated = [...prev]
         updated[updated.length - 1] = {
-          role: "ai",
+          ...updated[updated.length - 1],
           text: finalReply.slice(0, index),
+          docType: documentType,
         }
         return updated
       })
@@ -1400,11 +1480,19 @@ ${profile.phone}`,
     }, 15)
   }
 
-  const askAgent = async (messageText) => {
+  const askAgent = async (messageText, documentType = "response") => {
     const cleanMessage = messageText.trim()
     if (!cleanMessage) return
 
-    setAiMessages((prev) => [...prev, { role: "user", text: cleanMessage }])
+    setAiMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        text: cleanMessage,
+        docType: "response",
+      },
+    ])
+
     setAiInput("")
     setAiLoading(true)
 
@@ -1431,6 +1519,7 @@ ${profile.phone}`,
             salaryRange: search.salaryRange,
             salaryPreference: getSalaryRangeText(search.salaryRange),
           },
+          documentType,
         }),
       })
 
@@ -1450,7 +1539,7 @@ ${profile.phone}`,
       }
 
       setAiLoading(false)
-      typeAiResponse(data.reply)
+      typeAiResponse(data.reply, documentType)
     } catch (error) {
       console.error("AI agent frontend error:", error)
       setAiLoading(false)
@@ -1459,6 +1548,7 @@ ${profile.phone}`,
         {
           role: "ai",
           text: `Sorry, AI failed: ${error.message}`,
+          docType: "response",
         },
       ])
     } finally {
@@ -1466,8 +1556,8 @@ ${profile.phone}`,
     }
   }
 
-  const quickAskAgent = (prompt) => {
-    askAgent(prompt)
+  const quickAskAgent = (prompt, documentType = "response") => {
+    askAgent(prompt, documentType)
     setTimeout(() => scrollToSection("ai-agent"), 100)
   }
 
@@ -1607,6 +1697,7 @@ ${profile.phone}`,
       {
         role: "ai",
         text: "Chat cleared ✅ Ask me anything about resumes, skills, interviews, jobs, or applications.",
+        docType: "response",
       },
     ])
 
@@ -1725,7 +1816,8 @@ ${profile.phone}`,
                 color="purple"
                 onClick={() =>
                   quickAskAgent(
-                    "Generate a professional resume only. Use this exact structure: PROFESSIONAL SUMMARY, TECHNICAL SKILLS, PROJECTS, EDUCATION, CERTIFICATIONS, STRENGTHS, DECLARATION. Use only the candidate profile details. Do not add fake details. Keep it clean, direct, and job-ready."
+                    "Generate a professional resume only. Use this exact structure: PROFESSIONAL SUMMARY, TECHNICAL SKILLS, PROJECTS, EDUCATION, CERTIFICATIONS, STRENGTHS, DECLARATION. Use only the candidate profile details. Do not add fake details. Keep it clean, direct, and job-ready.",
+                    "resume"
                   )
                 }
               >
@@ -1736,7 +1828,8 @@ ${profile.phone}`,
                 color="gray"
                 onClick={() =>
                   quickAskAgent(
-                    "Check my candidate profile and tell me what resume details are missing or weak. Give exact improvements."
+                    "Check my candidate profile and tell me what resume details are missing or weak. Give exact improvements.",
+                    "response"
                   )
                 }
               >
@@ -1747,7 +1840,8 @@ ${profile.phone}`,
                 color="blue"
                 onClick={() =>
                   quickAskAgent(
-                    "Create a personalized 30-day skill improvement roadmap for my target role based on my current skills, education, projects, and salary preference."
+                    "Create a personalized 30-day skill improvement roadmap for my target role based on my current skills, education, projects, and salary preference.",
+                    "response"
                   )
                 }
               >
@@ -1758,7 +1852,8 @@ ${profile.phone}`,
                 color="green"
                 onClick={() =>
                   quickAskAgent(
-                    "Prepare me for interviews for my target role. Give common questions, strong sample answers, and practice advice based on my skills and projects."
+                    "Prepare me for interviews for my target role. Give common questions, strong sample answers, and practice advice based on my skills and projects.",
+                    "response"
                   )
                 }
               >
@@ -1769,7 +1864,8 @@ ${profile.phone}`,
                 color="pink"
                 onClick={() =>
                   quickAskAgent(
-                    "Generate a short professional application email for the selected job using my full candidate profile and salary preference. Make it human, clean, and not repetitive."
+                    "Generate a short professional application email for the selected job using my full candidate profile and salary preference. Make it human, clean, and not repetitive.",
+                    "letter"
                   )
                 }
               >
@@ -1792,10 +1888,10 @@ ${profile.phone}`,
               <div className="mb-4 bg-gradient-to-r from-purple-600/25 to-blue-600/25 border border-purple-400/30 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <p className="text-sm text-purple-200 font-semibold">
-                    Latest professional document is ready
+                    Latest document is ready
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    Copy it, export as PDF, or download as Word/DOC.
+                    Type: {latestAi.docType || "response"} — Copy it, export as PDF, or download as DOC.
                   </p>
                 </div>
 
@@ -1810,7 +1906,12 @@ ${profile.phone}`,
 
                   <button
                     type="button"
-                    onClick={() => exportMessageAsPdf(latestAi.text)}
+                    onClick={() =>
+                      exportMessageAsPdf(
+                        latestAi.text,
+                        latestAi.docType || "response"
+                      )
+                    }
                     className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-xl text-sm font-semibold"
                   >
                     Export PDF
@@ -1818,7 +1919,12 @@ ${profile.phone}`,
 
                   <button
                     type="button"
-                    onClick={() => exportMessageAsDoc(latestAi.text)}
+                    onClick={() =>
+                      exportMessageAsDoc(
+                        latestAi.text,
+                        latestAi.docType || "response"
+                      )
+                    }
                     className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-xl text-sm font-semibold"
                   >
                     Export DOC
@@ -1841,9 +1947,16 @@ ${profile.phone}`,
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10 bg-white/5">
-                    <p className="text-xs uppercase tracking-wide text-gray-400">
-                      {msg.role === "user" ? "You" : "JobPilot AI"}
-                    </p>
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-gray-400">
+                        {msg.role === "user" ? "You" : "JobPilot AI"}
+                      </p>
+                      {msg.role === "ai" && (
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          Export type: {msg.docType || "response"}
+                        </p>
+                      )}
+                    </div>
 
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -1858,7 +1971,12 @@ ${profile.phone}`,
                         <>
                           <button
                             type="button"
-                            onClick={() => exportMessageAsPdf(msg.text)}
+                            onClick={() =>
+                              exportMessageAsPdf(
+                                msg.text,
+                                msg.docType || "response"
+                              )
+                            }
                             className="bg-purple-600 hover:bg-purple-700 px-3 py-1.5 rounded-lg text-xs font-semibold"
                           >
                             PDF
@@ -1866,7 +1984,12 @@ ${profile.phone}`,
 
                           <button
                             type="button"
-                            onClick={() => exportMessageAsDoc(msg.text)}
+                            onClick={() =>
+                              exportMessageAsDoc(
+                                msg.text,
+                                msg.docType || "response"
+                              )
+                            }
                             className="bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg text-xs font-semibold"
                           >
                             DOC
@@ -1897,7 +2020,7 @@ ${profile.phone}`,
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault()
-                    askAgent(aiInput)
+                    askAgent(aiInput, "response")
                   }
                 }}
                 placeholder="Ask JobPilot AI..."
@@ -1907,7 +2030,7 @@ ${profile.phone}`,
 
               <button
                 type="button"
-                onClick={() => askAgent(aiInput)}
+                onClick={() => askAgent(aiInput, "response")}
                 disabled={aiLoading}
                 className="bg-purple-600 hover:bg-purple-700 px-8 rounded-2xl font-semibold disabled:opacity-50"
               >
@@ -2331,7 +2454,8 @@ ${profile.phone}`,
               type="button"
               onClick={() =>
                 quickAskAgent(
-                  "Check my candidate profile and tell me what resume details are missing or weak. Give exact improvements."
+                  "Check my candidate profile and tell me what resume details are missing or weak. Give exact improvements.",
+                  "response"
                 )
               }
               className="bg-white/10 hover:bg-white/20 py-3 rounded-2xl font-semibold"
@@ -2343,7 +2467,8 @@ ${profile.phone}`,
               type="button"
               onClick={() =>
                 quickAskAgent(
-                  "Generate a professional resume only. Use this exact structure: PROFESSIONAL SUMMARY, TECHNICAL SKILLS, PROJECTS, EDUCATION, CERTIFICATIONS, STRENGTHS, DECLARATION. Use only the candidate profile details. Do not add fake details. Keep it clean, direct, and job-ready."
+                  "Generate a professional resume only. Use this exact structure: PROFESSIONAL SUMMARY, TECHNICAL SKILLS, PROJECTS, EDUCATION, CERTIFICATIONS, STRENGTHS, DECLARATION. Use only the candidate profile details. Do not add fake details. Keep it clean, direct, and job-ready.",
+                  "resume"
                 )
               }
               className="bg-purple-600 hover:bg-purple-700 py-3 rounded-2xl font-semibold"
