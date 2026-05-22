@@ -107,7 +107,11 @@ app.get("/jobs", async (req, res) => {
       })
     }
 
-    const url = `https://api.adzuna.com/v1/api/jobs/in/search/1?app_id=${process.env.ADZUNA_APP_ID}&app_key=${process.env.ADZUNA_APP_KEY}&results_per_page=10&what=${encodeURIComponent(
+    const url = `https://api.adzuna.com/v1/api/jobs/in/search/1?app_id=${
+      process.env.ADZUNA_APP_ID
+    }&app_key=${
+      process.env.ADZUNA_APP_KEY
+    }&results_per_page=10&what=${encodeURIComponent(
       role
     )}&where=${encodeURIComponent(location)}&content-type=application/json`
 
@@ -192,6 +196,13 @@ app.post("/send-email", async (req, res) => {
       port: 587,
       secure: false,
       requireTLS: true,
+      family: 4,
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
+      tls: {
+        servername: "smtp.gmail.com",
+      },
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
