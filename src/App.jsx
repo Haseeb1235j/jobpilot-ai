@@ -177,60 +177,35 @@ const templates = [
 
 
 const defaultResume = {
-  title: "Frontend Developer Resume",
+  title: "Untitled Resume",
   personal: {
-    name: "Mohammad Haseeb",
-    role: "Frontend Developer",
-    email: "haseeb@example.com",
-    phone: "+91 XXXXX XXXXX",
-    location: "Hyderabad, Telangana, India",
+    name: "",
+    role: "",
+    email: "",
+    phone: "",
+    location: "",
     linkedin: "",
-    github: "github.com/yourusername",
-    portfolio: "github.com/yourusername",
+    github: "",
+    portfolio: "",
   },
-  summary:
-    "Motivated and detail-oriented frontend developer with hands-on experience building responsive web applications using React, JavaScript, HTML, CSS, and APIs. Skilled in creating clean user interfaces, integrating APIs, and developing practical projects with a focus on performance and user experience.",
-  objective:
-    "Seeking an entry-level Frontend Developer role where I can apply my technical skills, improve professionally, and contribute to building clean, responsive, and user-friendly applications.",
+  summary: "",
+  objective: "",
   skills: {
-    languages: "C, C++, Python, JavaScript, HTML, CSS",
-    frontend: "ReactJS, Tailwind CSS, Responsive Design",
-    backend: "Node.js, Express.js",
-    database: "MySQL, MongoDB",
-    tools: "Git, GitHub, VS Code",
-    other: "Problem Solving, Debugging, API Integration",
+    languages: "",
+    frontend: "",
+    backend: "",
+    database: "",
+    tools: "",
+    other: "",
   },
-  projects: [
-    {
-      name: "JobPilot AI Career Assistant",
-      tech: "React, Tailwind CSS, Node.js, Express, Groq AI, Adzuna API",
-      link: "",
-      bullets: [
-        "Built an AI-powered career assistant with resume builder, real job search, job tracker, document upload, and application workflow.",
-        "Designed a clean responsive interface with AI chat, resume preview, export options, and saved application tracking.",
-        "Integrated backend APIs to support AI responses, document reading, and real job search functionality.",
-      ],
-    },
-  ],
+  projects: [],
   experience: [],
   internships: [],
-  education: [
-    {
-      degree: "Bachelor of Technology in Computer Science and Engineering",
-      institution: "",
-      location: "",
-      duration: "2022 – 2026",
-      details: "",
-    },
-  ],
+  education: [],
   certifications: [],
   achievements: [],
-  languages: [
-    { name: "English", level: "Professional" },
-    { name: "Hindi", level: "Professional" },
-    { name: "Telugu", level: "Native" },
-  ],
-  atsKeywords: "React, JavaScript, HTML, CSS, API Integration, Responsive Design",
+  languages: [],
+  atsKeywords: "",
   jobDescription: "",
   updatedAt: now(),
 }
@@ -597,6 +572,13 @@ const mobileUiStyles = `
 }
 @media (max-width:640px){
   .resume-page{width:794px!important;}
+  body{overflow-x:hidden!important;}
+  .resume-page{max-width:none!important;}
+  .jobpilot-mobile-content-safe{padding-bottom:96px!important;}
+  .jobpilot-mobile-bottom-nav{bottom:calc(10px + env(safe-area-inset-bottom,0px))!important;}
+  .mobile-action-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;}
+  .mobile-action-grid>*{width:100%!important;justify-content:center!important;}
+
   .auth-mobile-panel{margin:12px!important;border-radius:26px!important;}
   .auth-mobile-title{font-size:34px!important;line-height:1.05!important;}
   .jobpilot-mobile-tabs button{padding:10px 14px!important;font-size:12px!important;}
@@ -2061,18 +2043,22 @@ function ChatArea({
             <p className="text-sm text-slate-400">No chat box. This assistant only tells you what happened after your actions.</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-xs font-black text-emerald-100">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+            <div className="col-span-2 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-center text-xs font-black text-emerald-100 sm:col-span-1">
               {cloudLoading ? "Syncing..." : cloudStatus || "Cloud ready"}
             </div>
+            <label className="cursor-pointer rounded-2xl border border-blue-400/25 bg-blue-500/15 px-4 py-3 text-center text-sm font-black text-blue-100 transition hover:bg-blue-500/25">
+              Upload Resume
+              <input type="file" accept=".pdf,.docx,.txt,.csv,.json,.md,.png,.jpg,.jpeg,.webp" onChange={uploadFile} className="hidden" />
+            </label>
+            <Button onClick={autoFillDocument} disabled={!uploadedDocument} variant={uploadedDocument ? "primary" : "default"}>
+              Auto-fill
+            </Button>
             <Button onClick={saveResume} variant="primary">
               Save Resume
             </Button>
-            <Button onClick={autoFillDocument} disabled={!uploadedDocument}>
-              Auto-fill from Upload
-            </Button>
             <Button variant="premium" onClick={() => setFocusMode(!focusMode)}>
-              {focusMode ? "Exit Focus" : "Focus Mode"}
+              {focusMode ? "Exit Focus" : "Focus"}
             </Button>
           </div>
         </div>
@@ -2080,9 +2066,9 @@ function ChatArea({
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="grid h-full place-items-center">
-          <div className="w-full max-w-2xl rounded-[2rem] border border-white/10 bg-white/[0.04] p-6 text-center shadow-2xl shadow-black/20">
-            <div className="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-3xl bg-blue-500/10 text-3xl">📄</div>
-            <h3 className="text-2xl font-black text-white">Activity Assistant</h3>
+          <div className="w-full max-w-2xl rounded-[1.6rem] border border-white/10 bg-white/[0.04] p-4 text-center shadow-2xl shadow-black/20 sm:rounded-[2rem] sm:p-6">
+            <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-blue-500/10 text-2xl sm:mb-4 sm:h-16 sm:w-16 sm:rounded-3xl sm:text-3xl">📄</div>
+            <h3 className="text-xl font-black text-white sm:text-2xl">Activity Assistant</h3>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-slate-400">
               I will not chat or edit your resume. I only show short updates after you upload, auto-fill, edit, export, save, search jobs, or track applications.
             </p>
@@ -2122,7 +2108,7 @@ function ChatArea({
               </div>
             ) : (
               <div className="mt-6 rounded-3xl border border-dashed border-white/10 bg-slate-900/60 p-5 text-sm text-slate-400">
-                Upload a PDF, DOCX, TXT, JSON, CSV, MD, PNG, JPG, JPEG, or WEBP document.
+                Upload a PDF, DOCX, TXT, JSON, CSV, MD, PNG, JPG, JPEG, or WEBP resume/document. After upload, JobPilot will auto-fill your profile automatically.
               </div>
             )}
 
@@ -3984,10 +3970,10 @@ export default function App() {
   const [section, setSection] = useState("studio")
   const [focusMode, setFocusMode] = useState(false)
 
-  const [resume, setResume] = useState(() => normalizeResume(safeParse(localStorage.getItem("jobpilot_resume"), defaultResume)))
+  const [resume, setResume] = useState(() => normalizeResume(null))
   const [template, setTemplate] = useState(() => localStorage.getItem("jobpilot_template") || "modern")
-  const [savedResumes, setSavedResumes] = useState(() => safeParse(localStorage.getItem("jobpilot_saved_resumes"), []))
-  const [savedApplications, setSavedApplications] = useState(() => safeParse(localStorage.getItem("jobpilot_saved_applications"), []))
+  const [savedResumes, setSavedResumes] = useState(() => [])
+  const [savedApplications, setSavedApplications] = useState(() => [])
 
   const [chats, setChats] = useState(() => {
     const existing = safeParse(localStorage.getItem("jobpilot_chats"), null)
@@ -4002,7 +3988,7 @@ export default function App() {
               {
                 id: uid(),
                 role: "ai",
-                text: "Hi, I am JobPilot AI. I can create, edit, improve, and export your resume. Tell me what you want to change.",
+                text: "JobPilot is ready. Upload a resume/document, edit your profile, search jobs, or track applications. I will show activity updates only.",
               },
             ],
           },
@@ -4157,14 +4143,27 @@ export default function App() {
             name: item.name,
             date: item.date ? new Date(item.date).toLocaleString() : now(),
             template: item.template || "modern",
-            resume: item.resume,
+            resume: normalizeResume(item.resume),
           }))
           setSavedResumes(mappedResumes)
-          const latestCloud = mappedResumes[0]?.cloudId || mappedResumes[0]?.id
+          const latestResume = mappedResumes[0]
+          const latestCloud = latestResume?.cloudId || latestResume?.id
+          if (latestResume?.resume) {
+            setResume(normalizeResume(latestResume.resume))
+            setTemplate(latestResume.template || "modern")
+          }
           if (latestCloud) {
             cloudResumeIdRef.current = latestCloud
             localStorage.setItem("jobpilot_cloud_autosave_resume_id", latestCloud)
           }
+        } else {
+          // IMPORTANT PRIVACY FIX:
+          // A new or different user must not inherit any default/Haseeb/local resume.
+          cloudResumeIdRef.current = ""
+          localStorage.removeItem("jobpilot_cloud_autosave_resume_id")
+          setResume(normalizeResume(null))
+          setTemplate("modern")
+          setSavedResumes([])
         }
 
         if (Array.isArray(appData.applications) && appData.applications.length) {
@@ -4179,9 +4178,11 @@ export default function App() {
           setTimeout(() => {
             appSyncingRef.current = false
           }, 500)
+        } else {
+          setSavedApplications([])
         }
 
-        notifyActivity("Cloud sync complete", "Online resumes and applications were loaded.")
+        notifyActivity("Cloud sync complete", "Your private online workspace was loaded for this account only.")
       } catch (error) {
         notifyActivity("Cloud sync skipped", error.message || "Could not load online data.")
       } finally {
@@ -4413,9 +4414,22 @@ export default function App() {
       })
 
       const nextAuth = { token: data.token, user: data.user }
+
+      // PRIVACY FIX: clear any old/default local workspace before loading this user's cloud data.
+      localStorage.removeItem("jobpilot_resume")
+      localStorage.removeItem("jobpilot_saved_resumes")
+      localStorage.removeItem("jobpilot_saved_applications")
+      localStorage.removeItem("jobpilot_cloud_autosave_resume_id")
+      cloudResumeIdRef.current = ""
+      cloudSyncReadyRef.current = false
+      setResume(normalizeResume(null))
+      setSavedResumes([])
+      setSavedApplications([])
+      setTemplate("modern")
+
       setAuth(nextAuth)
       localStorage.setItem("jobpilot_auth", JSON.stringify(nextAuth))
-      notifyActivity("Account connected", "Your workspace can now save resumes online.")
+      notifyActivity("Account connected", "Your private workspace is loading for this account only.")
     } catch (error) {
       setAuthError(friendlyError(error, "Authentication failed."))
     } finally {
@@ -4476,10 +4490,18 @@ export default function App() {
 
   const logoutUser = () => {
     localStorage.removeItem("jobpilot_auth")
+    localStorage.removeItem("jobpilot_resume")
+    localStorage.removeItem("jobpilot_saved_resumes")
+    localStorage.removeItem("jobpilot_saved_applications")
+    localStorage.removeItem("jobpilot_cloud_autosave_resume_id")
+    cloudResumeIdRef.current = ""
+    cloudSyncReadyRef.current = false
     setAuth(null)
+    setResume(normalizeResume(null))
+    setTemplate("modern")
     setSavedResumes([])
     setSavedApplications([])
-    setActivityText("Logged out — Login again to load your online resumes.")
+    setActivityText("Logged out — Private workspace cleared from this browser.")
   }
 
   const addMessage = (role, text) => {
@@ -5044,9 +5066,14 @@ export default function App() {
       }
 
       setUploadedDocument(data)
-      addMessage("ai", `Uploaded ${data.fileName}. I extracted ${data.chars} characters. Now click Create Resume or Auto-fill.`)
+      setResume((prev) => {
+        const parsed = extractResumeProfileFromText(data.text, prev)
+        return ensureResumeHasUsefulDefaults(parsed.resume)
+      })
+      notifyActivity("Resume uploaded and auto-filled", `I read ${data.fileName}, extracted ${data.chars} characters, and filled the details I could find.`)
+      addMessage("ai", `Uploaded ${data.fileName}. I extracted ${data.chars} characters and auto-filled your profile/resume where possible. You can still click Auto-fill again if you want to retry.`)
     } catch {
-      addMessage("ai", "Upload failed. Check backend terminal.")
+      addMessage("ai", "Upload failed. Make sure the backend is online, then try a PDF/DOCX/TXT resume with readable text.")
     } finally {
       setAiLoading(false)
       e.target.value = ""
@@ -5083,7 +5110,7 @@ export default function App() {
       })
       addMessage("ai", `Done. I extracted ${data.chars} characters from ${data.fileName} and updated your ${sectionName} details where possible.`)
     } catch {
-      addMessage("ai", "Upload failed. Check backend terminal.")
+      addMessage("ai", "Upload failed. Make sure the backend is online, then try a PDF/DOCX/TXT resume with readable text.")
     } finally {
       setAiLoading(false)
       e.target.value = ""
